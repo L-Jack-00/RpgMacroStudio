@@ -517,6 +517,27 @@ public partial class MainForm
         using var dlg = new AiAssistantDialog();
         if (dlg.ShowDialog(this) == DialogResult.OK && dlg.GeneratedProfile != null)
         {
+            var aiProfile = dlg.GeneratedProfile;
+            bool hasExistingWork = _profile.Events.Count > 0 || _profile.States.Count(s => !MacroEventProfile.IsGlobalState(s)) > 1 || _isDirty;
+
+            AiApplyChoice choice = AiApplyChoice.Replace;
+            if (hasExistingWork)
+            {
+                using var optDlg = new AiApplyOptionDialog(_profile.Events.Count, _profile.States.Count);
+                if (optDlg.ShowDialog(this) != DialogResult.OK || optDlg.Choice == AiApplyChoice.Cancel)
+                {
+                    return; // 취소 시 기존 상태 온전히 보존
+                }
+                choice = optDlg.Choice;
+            }
+
+            if (choice == AiApplyChoice.Merge)
+            {
+                MergeAiProfile(aiProfile);
+                return;
+            }
+
+            // 덮어쓰기(Replace) 선택 시: 저장되지 않은 변경사항 확인
             if (_isDirty)
             {
                 var res = MessageBox.Show(Localization.Get("PromptUnsavedChanges"), Localization.Get("TitleUnsavedChanges"), MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
@@ -525,10 +546,10 @@ public partial class MainForm
             }
 
             RecordUndo(Localization.IsKorean
-                ? $"AI 프로필 적용 [{dlg.GeneratedProfile.ProfileName}]"
-                : $"Apply AI Profile [{dlg.GeneratedProfile.ProfileName}]");
+                ? $"AI 프로필 교체 적용 [{aiProfile.ProfileName}]"
+                : $"Apply AI Profile [{aiProfile.ProfileName}]");
 
-            _profile = dlg.GeneratedProfile;
+            _profile = aiProfile;
             _canvas.Profile = _profile;
 
             if (CurrentViewMode == AppViewMode.CanvasPinGraph)
@@ -547,6 +568,89 @@ public partial class MainForm
                 ? $"✨ [AI 어시스턴트] '{_profile.ProfileName}' 프로필이 생성되어 캔버스에 즉시 적용되었습니다."
                 : $"✨ [AI Assistant] '{_profile.ProfileName}' profile generated and applied to canvas.");
         }
+    }
+
+    private void MergeAiProfile(MacroEventProfile aiProfile)
+    {
+        bool ko = Localization.IsKorean;
+        RecordUndo(ko
+            ? $"AI 프로필 병합 [{aiProfile.ProfileName}]"
+            : $"Merge AI Profile [{aiProfile.ProfileName}]");
+
+        // 상태 이름 매핑 테이블 (구 이름 -> 신규 고유 이름)
+        var stateMapping = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        int addedStatesCount = 0;
+        foreach (var state in aiProfile.States)
+        {
+            if (MacroEventProfile.IsGlobalState(state))
+            {
+                stateMapping[state] = "전역";
+                continue;
+            }
+
+            // 기존 상태와 충돌하면 새 고유 이름 부여
+            string uniqueState = _profile.States.Contains(state)
+                ? GenerateUniqueStateName(state)
+                : state;
+
+            stateMapping[state] = uniqueState;
+            _profile.States.Add(uniqueState);
+            addedStatesCount++;
+
+            // 노드 위치: 기존 노드와 겹치지 않는 안전한 위치에 스폰
+            aiProfile.NodePositions.TryGetValue(state, out var origPos);
+            float prefX = origPos != null ? origPos.X : 300f;
+            float prefY = origPos != null ? origPos.Y : 150f;
+            var safePos = MacroLayoutEngine.FindSafeSpawnPosition(_profile, prefX, prefY);
+            _profile.NodePositions[uniqueState] = safePos;
+
+            // 노드 크기
+            if (aiProfile.NodeSizes.TryGetValue(state, out var sz))
+            {
+                _profile.NodeSizes[uniqueState] = new NodeCanvasSize(sz.Width, sz.Height);
+            }
+        }
+
+        // 이벤트 복제 및 매핑
+        int addedEventsCount = 0;
+        MacroEvent? firstAddedEvt = null;
+        foreach (var origEvt in aiProfile.Events)
+        {
+            string mappedState = stateMapping.TryGetValue(origEvt.StateTag, out var mapped)
+                ? mapped
+                : _profile.InitialState;
+
+            var cloneEvt = CloneEvent(origEvt, mappedState);
+
+            // 이벤트 내부의 상태 전환(ChangeState) 타겟 상태도 매핑된 이름으로 변경
+            foreach (var act in cloneEvt.Actions)
+            {
+                if (act.Type == ActionType.ChangeState && !string.IsNullOrEmpty(act.TargetState))
+                {
+                    if (stateMapping.TryGetValue(act.TargetState, out var targetMapped))
+                    {
+                        act.TargetState = targetMapped;
+                        act.Description = ko ? $"상태 전환: [{targetMapped}]" : $"Change State: [{targetMapped}]";
+                    }
+                }
+            }
+
+            _profile.Events.Add(cloneEvt);
+            firstAddedEvt ??= cloneEvt;
+            addedEventsCount++;
+        }
+
+        _isDirty = true;
+        SyncAndRefreshAllViews();
+        if (firstAddedEvt != null)
+        {
+            OnCanvasSelectionChanged(firstAddedEvt.StateTag, firstAddedEvt);
+        }
+
+        Log(ko
+            ? $"✨ [AI 어시스턴트] '{aiProfile.ProfileName}'의 상태 {addedStatesCount}개, 이벤트 {addedEventsCount}개가 기존 프로필에 성공적으로 병합되었습니다."
+            : $"✨ [AI Assistant] Merged {addedStatesCount} states and {addedEventsCount} events from '{aiProfile.ProfileName}'.");
     }
 
     public void RecordUndo() => RecordUndo(Localization.IsKorean ? "이전 작업" : "Previous Action");

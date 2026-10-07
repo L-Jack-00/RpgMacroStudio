@@ -561,7 +561,8 @@ def check_unified_project(base_dir):
     # (1) 크기 조절 불필요 다이얼로그 고정 검사
     fixed_dialog_files = [
         "GetStartedDialog.cs", "TemplateWizardDialog.cs", "SettingsForm.cs",
-        "EventEditDialog.cs", "TriggerEditDialog.cs", "ActionEditDialog.cs", "ChangelogDialog.cs"
+        "EventEditDialog.cs", "TriggerEditDialog.cs", "ActionEditDialog.cs", "ChangelogDialog.cs",
+        "AiApplyOptionDialog.cs"
     ]
     for df in fixed_dialog_files:
         df_path = os.path.join(src_dir, "RpgMacroStudio", "UI", df)

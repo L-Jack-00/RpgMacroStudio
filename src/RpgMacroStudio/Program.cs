@@ -370,7 +370,17 @@ internal static class Program
                 return false;
             }
 
-            Console.WriteLine($"  ✔ [통과] 다크모드 타이틀바(DWM) 및 다크 스크롤바 도킹 무결성 검증 (패치노트 Scroll={scrollLog.Bounds}, AI 어시스턴트 FormBg={aiDlg.BackColor})");
+            // 3. AI 적용 방식 선택 다이얼로그(AiApplyOptionDialog) 테마 및 무결성 검증
+            using var optDlg = new AiApplyOptionDialog(5, 2);
+            var optHandle = optDlg.Handle;
+            bool optValid = optDlg.FormBorderStyle == FormBorderStyle.FixedDialog && !optDlg.MaximizeBox && optDlg.BackColor.R < 50;
+            if (!optValid)
+            {
+                Console.WriteLine($"  ❌ [실패] AI 적용 옵션 다이얼로그 무결성 결함: FormBorderStyle={optDlg.FormBorderStyle}, MaximizeBox={optDlg.MaximizeBox}, Bg={optDlg.BackColor}");
+                return false;
+            }
+
+            Console.WriteLine($"  ✔ [통과] 다크모드 타이틀바(DWM) 및 다크 스크롤바 도킹 무결성 검증 (패치노트 Scroll={scrollLog?.Bounds}, AI 어시스턴트 FormBg={aiDlg.BackColor}, AI 적용옵션 Bg={optDlg.BackColor})");
             return true;
         }
         catch (Exception ex)
