@@ -325,6 +325,7 @@ public partial class MainForm
             _isDirty = true;
             SyncAndRefreshAllViews();
             OnCanvasSelectionChanged(state, null);
+            Log(Localization.IsKorean ? $"🗑️ 이벤트 삭제됨: [{evt.Name}]" : $"🗑️ Event deleted: [{evt.Name}]");
         }
     }
 
@@ -349,6 +350,9 @@ public partial class MainForm
         _isDirty = true;
         SyncAndRefreshAllViews();
         OnCanvasSelectionChanged(state, newEvt);
+        Log(Localization.IsKorean
+            ? $"⚡ 새 이벤트 추가됨: [{newEvt.Name}] (소속: '{stateDisplay}')"
+            : $"⚡ New event added: [{newEvt.Name}] (State: '{stateDisplay}')");
     }
 
 

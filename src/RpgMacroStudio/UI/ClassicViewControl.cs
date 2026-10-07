@@ -50,6 +50,8 @@ public class ClassicViewControl : UserControl
     public event Action<MacroEvent, MacroTrigger>? EditTriggerRequested;
     public event Action<MacroEvent, MacroTrigger>? DeleteTriggerRequested;
     public event Action<MacroEvent>? RecordMacroRequested;
+    public event Action<string>? AddEventRequested;
+    public event Action<string, MacroEvent>? DeleteEventRequested;
     public event Action? CopyRequested;
     public event Action? PasteRequested;
 
@@ -1507,6 +1509,12 @@ public class ClassicViewControl : UserControl
             ? (_profile.InitialState ?? _profile.States.FirstOrDefault() ?? "기본 상태")
             : SelectedState;
 
+        if (AddEventRequested != null)
+        {
+            AddEventRequested.Invoke(targetState);
+            return;
+        }
+
         var newEvent = new MacroEvent
         {
             Name = Localization.IsKorean ? $"새 이벤트 {_profile.Events.Count + 1}" : $"New Event {_profile.Events.Count + 1}",
@@ -1523,6 +1531,12 @@ public class ClassicViewControl : UserControl
     private void OnDeleteEvent()
     {
         if (SelectedEvent == null) return;
+        if (DeleteEventRequested != null)
+        {
+            DeleteEventRequested.Invoke(SelectedEvent.StateTag, SelectedEvent);
+            return;
+        }
+
         RecordUndoRequested?.Invoke(Localization.IsKorean ? $"이벤트 삭제: [{SelectedEvent.Name}]" : $"Delete Event: [{SelectedEvent.Name}]");
         _profile.Events.Remove(SelectedEvent);
         SelectedEvent = null;

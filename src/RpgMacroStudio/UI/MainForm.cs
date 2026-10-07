@@ -511,6 +511,8 @@ public partial class MainForm : Form
         _classicControl.RecordMacroRequested += evt => StartMacroRecordingForEvent(evt);
         _classicControl.CopyRequested += () => CopyCurrentSelectionToClipboard();
         _classicControl.PasteRequested += () => PasteFromClipboard();
+        _classicControl.AddEventRequested += state => AddEventToSpecificState(state);
+        _classicControl.DeleteEventRequested += (state, evt) => DeleteSpecificEvent(state, evt);
 
         _splitMain.Panel1.Controls.Add(_classicControl);
         _splitMain.Panel1.Controls.Add(_canvas);

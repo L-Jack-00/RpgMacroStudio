@@ -38,6 +38,11 @@ def check_unified_project(base_dir):
             "details": [],
             "issues": []
         },
+        "undo_redo_clipboard_check": {
+            "status": "PASS",
+            "details": [],
+            "issues": []
+        },
         "packaging_check": {}
     }
 
@@ -456,6 +461,98 @@ def check_unified_project(base_dir):
     }
 
     # ---------------------------------------------------------
+    # 9. 실행 취소/다시 실행(Undo/Redo) & 노드 클립보드 검수 에이전트
+    # ---------------------------------------------------------
+    undo_issues = []
+    undo_details = []
+
+    # (1) 언두/리두 구체 액션명 전수 전달 검증 (매개변수 없는 빈 RecordUndo() 호출 0건)
+    empty_undo_found = False
+    for r, d, files in os.walk(src_dir):
+        for f in files:
+            if f.endswith(".cs"):
+                fpath = os.path.join(r, f)
+                with open(fpath, "r", encoding="utf-8") as cs_f:
+                    lines = cs_f.readlines()
+                for l_idx, l in enumerate(lines, 1):
+                    if re.search(r'\bRecordUndo\s*\(\s*\)', l) and "void RecordUndo" not in l and "Action" not in l:
+                        empty_undo_found = True
+                        undo_issues.append(f"{f}:{l_idx} - 매개변수 없는 RecordUndo() 호출 발견: {l.strip()}")
+    if not empty_undo_found:
+        undo_details.append("언두/리두 전수 구체적 액션명 매개변수 전달(빈 RecordUndo 호출 0건) 확인")
+
+    # (2) 실행 취소/다시 실행 구체적 행동 로그 검증
+    mainform_dir = os.path.join(src_dir, "RpgMacroStudio", "UI")
+    mc = ""
+    if os.path.exists(mainform_dir):
+        for f_name in sorted(os.listdir(mainform_dir)):
+            if f_name.startswith("MainForm") and f_name.endswith(".cs") and not f_name.endswith(".bak"):
+                with open(os.path.join(mainform_dir, f_name), "r", encoding="utf-8") as f:
+                    mc += f.read() + "\n"
+
+    if mc:
+        if "↶ 실행 취소(Undo): [" in mc and "↷ 다시 실행(Redo): [" in mc:
+            undo_details.append("실행 취소/다시 실행 시 구체적 액션명(노드 이동, 이름 변경 등) 실시간 로그 출력 확인")
+        else:
+            undo_issues.append("MainForm.Harness.cs: 구체적 Undo/Redo 액션명 로그 미출력")
+
+        # (3) 노드 복사/붙여넣기 전 뷰(FSM/핀/클래식) 단축키 및 안전 가드 검증
+        has_copy = "CopyCurrentSelectionToClipboard" in mc
+        has_paste = "PasteFromClipboard" in mc
+        has_safe_spawn = "FindSafeSpawnPosition" in mc
+        has_undo_paste = "RecordUndo" in mc and "붙여넣기" in mc
+        has_header_guard = "MagicHeader" in mc and "return false" in mc
+
+        pcmd_has_copy = "Keys.Control | Keys.C" in mc and "CopyCurrentSelectionToClipboard" in mc
+        pcmd_has_paste = "Keys.Control | Keys.V" in mc and "PasteFromClipboard" in mc
+        textbox_protected = "ActiveControl is not TextBoxBase" in mc
+
+        if has_copy and has_paste and pcmd_has_copy and pcmd_has_paste and textbox_protected:
+            undo_details.append("전 뷰 공통 노드/이벤트 복사(Ctrl+C) 및 붙여넣기(Ctrl+V) 라우팅 및 텍스트박스 포커스 보호 확인")
+        else:
+            if not (has_copy and has_paste):
+                undo_issues.append("MainForm.Harness.cs: CopyCurrentSelectionToClipboard 또는 PasteFromClipboard 누락")
+            if not (pcmd_has_copy and pcmd_has_paste):
+                undo_issues.append("MainForm.cs: ProcessCmdKey 내 Ctrl+C / Ctrl+V 라우팅 누락")
+            if not textbox_protected:
+                undo_issues.append("MainForm.cs: 클립보드 단축키 처리 시 TextBox 포커스 방어 미흡")
+
+        if has_safe_spawn and has_undo_paste and has_header_guard:
+            undo_details.append("노드 붙여넣기 겹침 방지 자동 스폰, 타 텍스트 조용한 무시 가드 및 Undo/Redo 연동 확인")
+        else:
+            if not has_safe_spawn:
+                undo_issues.append("MainForm.Harness.cs: 붙여넣기 노드 겹침 방지(FindSafeSpawnPosition) 미연동")
+            if not has_undo_paste:
+                undo_issues.append("MainForm.Harness.cs: 붙여넣기 동작 Undo(RecordUndo) 기록 누락")
+            if not has_header_guard:
+                undo_issues.append("MainForm.Harness.cs: 클립보드 매직 헤더 검사 및 무효 데이터 조용한 무시 가드 누락")
+    else:
+        undo_issues.append("MainForm UI 폴더 누락")
+
+    # (4) 이벤트/상태 추가 및 삭제 시 실시간 Log 출력 무결성 검증
+    events_code_path = os.path.join(src_dir, "RpgMacroStudio", "UI", "MainForm.Events.cs")
+    if os.path.exists(events_code_path):
+        with open(events_code_path, "r", encoding="utf-8") as ef:
+            ec = ef.read()
+        has_add_event_log = "새 이벤트 추가됨" in ec and "Log(" in ec
+        has_del_event_log = "이벤트 삭제됨" in ec and "Log(" in ec
+        if has_add_event_log and has_del_event_log:
+            undo_details.append("새 이벤트 추가 및 삭제 시 실시간 사용자 로그(Log) 알림 완비 확인")
+        else:
+            if not has_add_event_log:
+                undo_issues.append("MainForm.Events.cs: AddEventToSpecificState 내 '새 이벤트 추가됨' 로그 누락")
+            if not has_del_event_log:
+                undo_issues.append("MainForm.Events.cs: DeleteSpecificEvent 내 '이벤트 삭제됨' 로그 누락")
+    else:
+        undo_issues.append("MainForm.Events.cs 파일 누락")
+
+    report["undo_redo_clipboard_check"] = {
+        "status": "PASS" if len(undo_issues) == 0 else "FAIL",
+        "details": undo_details,
+        "issues": undo_issues
+    }
+
+    # ---------------------------------------------------------
     # 10. UI 적응형/리사이즈 안전성 검수 에이전트 (Adaptive & Layout Safety)
     # ---------------------------------------------------------
     ui_safety_issues = []
@@ -607,16 +704,10 @@ def check_unified_project(base_dir):
             view_tab_details.append("캔버스 우클릭 메뉴에 [⚡ 이벤트 활성 / 비활성화 (Space)] 추가 확인")
         else:
             view_tab_issues.append("MainForm.cs: 캔버스 우클릭 메뉴에 이벤트 활성 토글 미등록")
-
-        # (6) 실행 취소/다시 실행 구체적 행동 로그
-        if "↶ 실행 취소(Undo): [" in mf_content and "↷ 다시 실행(Redo): [" in mf_content:
-            view_tab_details.append("실행 취소/다시 실행 시 구체적 액션명(노드 이동, 이름 변경 등) 로그 출력 확인")
-        else:
-            view_tab_issues.append("MainForm.cs: 구체적 Undo/Redo 액션명 로그 미출력")
     else:
         view_tab_issues.append("MainForm.cs 파일 없음")
 
-    # (7) 클래식 뷰 34px 행 높이 및 2줄 표시, 필터 독립
+    # (6) 클래식 뷰 34px 행 높이 및 2줄 표시, 필터 독립
     if os.path.exists(classic_path):
         with open(classic_path, "r", encoding="utf-8") as f:
             cl_content = f.read()
@@ -625,7 +716,7 @@ def check_unified_project(base_dir):
         else:
             view_tab_issues.append("ClassicViewControl.cs: 행 높이 34px 또는 탭 필터 분리 미비")
 
-    # (8) 패치노트 이중 언어 및 유저 친화적 문구
+    # (7) 패치노트 이중 언어 및 유저 친화적 문구
     if os.path.exists(verinfo_path):
         with open(verinfo_path, "r", encoding="utf-8") as f:
             vi_content = f.read()
@@ -634,34 +725,19 @@ def check_unified_project(base_dir):
         else:
             view_tab_issues.append("VersionInfo.cs: 패치노트 영문 또는 명칭 미개편")
 
-    # (9) 인스펙터 반응형 동적 리사이즈 엔진 검증
+    # (8) 인스펙터 반응형 동적 리사이즈 엔진 검증
     if "ResizeInspectorContents" in mf_content and "_pnlInspector.Resize += (s, e) => ResizeInspectorContents();" in mf_content:
         view_tab_details.append("인스펙터 폭 변경 시 조건/행동 버튼 및 컨트롤 자동 비례 맞춤(ResizeInspectorContents) 확인")
     else:
         view_tab_issues.append("MainForm.cs: 인스펙터 동적 반응형 리사이즈 연동 미비")
 
-    # (10) 상단 툴바 축소 시 34x30 규격 일관성 검증
+    # (9) 상단 툴바 축소 시 34x30 규격 일관성 검증
     if "MinimumSize = Size.Empty" in mf_content and "Size = new Size(34, 30)" in mf_content:
         view_tab_details.append("툴바 컴팩트 축소 시 모든 버튼 34x30 규격 통일 및 80px 돌출 방지 확인")
     else:
         view_tab_issues.append("MainForm.cs: 툴바 컴팩트 축소 규격(34x30) 미비")
 
-    # (11) 언두/리두 구체 액션명 전수 전달 검증 (빈 RecordUndo() 호출 미존재)
-    empty_undo_found = False
-    for r, d, files in os.walk(src_dir):
-        for f in files:
-            if f.endswith(".cs"):
-                fpath = os.path.join(r, f)
-                with open(fpath, "r", encoding="utf-8") as cs_f:
-                    lines = cs_f.readlines()
-                for l_idx, l in enumerate(lines, 1):
-                    if re.search(r'\bRecordUndo\s*\(\s*\)', l) and "void RecordUndo" not in l and "Action" not in l:
-                        empty_undo_found = True
-                        view_tab_issues.append(f"{f}:{l_idx} - 매개변수 없는 RecordUndo() 호출 발견: {l.strip()}")
-    if not empty_undo_found:
-        view_tab_details.append("언두/리두 전수 구체적 액션명 매개변수 전달(빈 RecordUndo 호출 0건) 확인")
-
-    # (12) 도우미 마법사 상호배제 및 영구 설정 플래그 검증
+    # (10) 도우미 마법사 상호배제 및 영구 설정 플래그 검증
     wiz_path = os.path.join(src_dir, "RpgMacroStudio", "UI", "TemplateWizardDialog.cs")
     app_settings_path = os.path.join(src_dir, "RpgMacroStudio.Core", "Data", "AppSettings.cs")
     wiz_ok = True
@@ -680,7 +756,7 @@ def check_unified_project(base_dir):
     if wiz_ok:
         view_tab_details.append("도우미 마법사 2단계 라디오 버튼 단일 선택 상호배제 및 1회 열람 시 버튼 색상 영구 전환 확인")
 
-    # (13) 시작 안내 단축키 뱃지 커스텀 페인트 보호 검증
+    # (11) 시작 안내 단축키 뱃지 커스텀 페인트 보호 검증
     guide_path = os.path.join(src_dir, "RpgMacroStudio", "UI", "GetStartedDialog.cs")
     if os.path.exists(guide_path):
         with open(guide_path, "r", encoding="utf-8") as gf:
@@ -763,7 +839,10 @@ def main():
         all_passed = False
         agent_issues.append(("8. 키보드 인터랙션 일관성 검수 에이전트", kbc["issues"]))
 
-    pkg = rep["packaging_check"]
+    urc = rep.get("undo_redo_clipboard_check", {"status": "PASS", "details": [], "issues": []})
+    if len(urc.get("issues", [])) > 0:
+        all_passed = False
+        agent_issues.append(("9. 실행 취소/다시 실행(Undo/Redo) & 클립보드 검수 에이전트", urc["issues"]))
 
     uis = rep.get("ui_safety_check", {"status": "PASS", "details": [], "issues": []})
     if len(uis.get("issues", [])) > 0:
@@ -779,6 +858,8 @@ def main():
     if len(vtc.get("issues", [])) > 0:
         all_passed = False
         agent_issues.append(("12. 3대 뷰 탭 전환 및 적응형 툴바 검수 에이전트", vtc["issues"]))
+
+    pkg = rep["packaging_check"]
 
     ver = vc.get('versioninfo_version', 'Unknown')
 
@@ -870,12 +951,13 @@ def main():
         for iss in kbc["issues"]:
             print(f"      ⚠️ {iss}")
 
-    # 9. 배포 패키징 검수 (보류 모드 지원)
-    print(f"  [9. 패키징 및 릴리즈 현황] 상태: {pkg['status']}")
-    print(f"      • Dist 바이너리: {pkg['dist_exe_size_mb']} MB (존재: {pkg['dist_exe_exists']})")
-    print(f"      • Dist ZIP 압축: {pkg['dist_zip_size_mb']} MB (존재: {pkg['dist_zip_exists']})")
-    if pkg["status"] == "HOLD":
-        print("      • ℹ️ 사용자 요청에 따라 이번 턴 릴리즈 배포(ZIP 압축) 보류 상태 유지")
+    # 9. 실행 취소/다시 실행(Undo/Redo) & 노드 클립보드 검수 에이전트
+    print(f"  [9. 실행 취소/다시 실행(Undo/Redo) & 노드 클립보드 검수 에이전트] 상태: {urc['status']}")
+    for det in urc["details"]:
+        print(f"      • {det}")
+    if len(urc["issues"]) > 0:
+        for iss in urc["issues"]:
+            print(f"      ⚠️ {iss}")
 
     # 10. UI 적응형/리사이즈 안전성 검수 에이전트
     print(f"  [10. UI 적응형/리사이즈 안전성 검수 에이전트] 상태: {uis['status']}")
@@ -900,6 +982,13 @@ def main():
     if len(vtc["issues"]) > 0:
         for iss in vtc["issues"]:
             print(f"      ⚠️ {iss}")
+
+    # [배포 및 릴리즈 현황]
+    print(f"\n  [📦 배포 패키징 및 릴리즈 현황] 상태: {pkg['status']}")
+    print(f"      • Dist 바이너리: {pkg['dist_exe_size_mb']} MB (존재: {pkg['dist_exe_exists']})")
+    print(f"      • Dist ZIP 압축: {pkg['dist_zip_size_mb']} MB (존재: {pkg['dist_zip_exists']})")
+    if pkg["status"] == "HOLD":
+        print("      • ℹ️ 사용자 요청에 따라 이번 턴 릴리즈 배포(ZIP 압축) 보류 상태 유지")
 
     print("\n" + "=" * 70)
     if all_passed:
