@@ -50,6 +50,8 @@ public class ClassicViewControl : UserControl
     public event Action<MacroEvent, MacroTrigger>? EditTriggerRequested;
     public event Action<MacroEvent, MacroTrigger>? DeleteTriggerRequested;
     public event Action<MacroEvent>? RecordMacroRequested;
+    public event Action? CopyRequested;
+    public event Action? PasteRequested;
 
     // 접기/펼치기 상태 기억 (기본: 모두 펼침)
     private readonly HashSet<string> _collapsedStates = new();
@@ -758,6 +760,8 @@ public class ClassicViewControl : UserControl
         });
 
         var sep1 = new ToolStripSeparator();
+        var itemCopy = new ToolStripMenuItem(ko ? "📋 복사 (Ctrl+C)" : "📋 Copy (Ctrl+C)", null, (s, e) => CopyRequested?.Invoke());
+        var itemPaste = new ToolStripMenuItem(ko ? "📥 붙여넣기 (Ctrl+V)" : "📥 Paste (Ctrl+V)", null, (s, e) => PasteRequested?.Invoke());
         var itemEdit = new ToolStripMenuItem(ko ? "✏️ 항목 편집 / 이름 변경 (F2/Enter)" : "✏️ Edit / Rename", null, (s, e) => EditCurrentSelection());
         var itemToggle = new ToolStripMenuItem(ko ? "🔄 활성 / 비활성 토글 (Space)" : "🔄 Toggle Enabled", null, (s, e) => ToggleCurrentSelectionEnabled());
         var sep2 = new ToolStripSeparator();
@@ -770,7 +774,7 @@ public class ClassicViewControl : UserControl
         {
             itemAddState, itemAddEvent, itemAddTrigger, itemAddAction, itemRecord,
             sep1,
-            itemEdit, itemToggle,
+            itemCopy, itemPaste, itemEdit, itemToggle,
             sep2,
             itemMoveUp, itemMoveDown,
             sep3,

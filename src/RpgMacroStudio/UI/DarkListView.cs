@@ -93,6 +93,7 @@ public class DarkListView : ListView
     }
 
     private const int WM_STYLECHANGING = 0x007C;
+    private const int WM_NCCALCSIZE = 0x0083;
     private const int GWL_STYLE = -16;
     private const int WS_VSCROLL = 0x00200000;
     private const int WS_HSCROLL = 0x00100000;
@@ -102,6 +103,15 @@ public class DarkListView : ListView
     {
         public int styleOld;
         public int styleNew;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NCCALCSIZE_PARAMS
+    {
+        public RECT rgrc0;
+        public RECT rgrc1;
+        public RECT rgrc2;
+        public IntPtr lppos;
     }
 
     protected override void WndProc(ref Message m)
@@ -122,6 +132,24 @@ public class DarkListView : ListView
             var ss = Marshal.PtrToStructure<STYLESTRUCT>(m.LParam);
             ss.styleNew &= ~(WS_VSCROLL | WS_HSCROLL);
             Marshal.StructureToPtr(ss, m.LParam, false);
+            m.Result = IntPtr.Zero;
+            return;
+        }
+
+        // 스크롤 시 OS 기본 스크롤바 영역(17px)이 계산되는 것을 방지하여
+        // 스크롤바가 그려질 공간 자체를 0으로 만들어 스크롤 시 찰나의 깜빡임까지 100% 원천 차단
+        if (HideNativeScrollBar && m.Msg == WM_NCCALCSIZE && m.WParam != IntPtr.Zero)
+        {
+            var ncp = Marshal.PtrToStructure<NCCALCSIZE_PARAMS>(m.LParam);
+            int origRight = ncp.rgrc0.Right;
+            int origBottom = ncp.rgrc0.Bottom;
+
+            base.WndProc(ref m);
+
+            ncp = Marshal.PtrToStructure<NCCALCSIZE_PARAMS>(m.LParam);
+            ncp.rgrc0.Right = origRight;
+            ncp.rgrc0.Bottom = origBottom;
+            Marshal.StructureToPtr(ncp, m.LParam, false);
             m.Result = IntPtr.Zero;
             return;
         }

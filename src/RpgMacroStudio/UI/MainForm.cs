@@ -509,6 +509,8 @@ public partial class MainForm : Form
         _classicControl.EditTriggerRequested += (evt, trg) => EditSpecificTrigger(evt, trg);
         _classicControl.DeleteTriggerRequested += (evt, trg) => DeleteSpecificTrigger(evt, trg);
         _classicControl.RecordMacroRequested += evt => StartMacroRecordingForEvent(evt);
+        _classicControl.CopyRequested += () => CopyCurrentSelectionToClipboard();
+        _classicControl.PasteRequested += () => PasteFromClipboard();
 
         _splitMain.Panel1.Controls.Add(_classicControl);
         _splitMain.Panel1.Controls.Add(_canvas);
@@ -523,6 +525,8 @@ public partial class MainForm : Form
         _canvas.ActionDeleteRequested += (evt, act) => DeleteSpecificAction(evt, act);
         _canvas.EventDeleteRequested += (state, evt) => DeleteSpecificEvent(state, evt);
         _canvas.AddEventToStateRequested += state => AddEventToSpecificState(state);
+        _canvas.CopyRequested += () => CopyCurrentSelectionToClipboard();
+        _canvas.PasteRequested += () => PasteFromClipboard();
         _canvas.PinGraphNodeEditRequested += node =>
         {
             if (node == null) return;
@@ -661,6 +665,20 @@ public partial class MainForm : Form
         {
             PerformRedo();
             return true;
+        }
+        if (keyData == (Keys.Control | Keys.C))
+        {
+            if (ActiveControl is not TextBoxBase && !(ActiveControl is ContainerControl cc && cc.ActiveControl is TextBoxBase))
+            {
+                if (CopyCurrentSelectionToClipboard()) return true;
+            }
+        }
+        if (keyData == (Keys.Control | Keys.V))
+        {
+            if (ActiveControl is not TextBoxBase && !(ActiveControl is ContainerControl cc && cc.ActiveControl is TextBoxBase))
+            {
+                if (PasteFromClipboard()) return true;
+            }
         }
         if (keyData == Keys.Delete)
         {

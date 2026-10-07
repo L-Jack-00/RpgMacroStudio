@@ -616,5 +616,182 @@ public partial class MainForm
         AppThemeHelper.UpdateUndoRedoButtonState(_btnRedo, _currentIsDark);
     }
 
+    /// <summary>
+    /// 현재 선택된 이벤트 또는 상태 노드를 JSON 클립보드 형식으로 복사합니다.
+    /// 모든 뷰 모드(캔버스, 핀그래프, 클래식 트리/리스트)에서 동일하게 동작합니다.
+    /// </summary>
+    public bool CopyCurrentSelectionToClipboard()
+    {
+        try
+        {
+            // 1. 이벤트가 선택되어 있다면 단일 이벤트 복사 우선
+            if (CurrentSelectedEvent != null)
+            {
+                var envelope = new NodeClipboardEnvelope
+                {
+                    Kind = "Event",
+                    SingleEvent = CurrentSelectedEvent
+                };
+                string json = MacroEventProfileManager.SaveToString(envelope);
+                Clipboard.SetText(json);
+                Log(Localization.IsKorean
+                    ? $"📋 이벤트 ['{CurrentSelectedEvent.Name}'] 클립보드 복사 완료"
+                    : $"📋 Event ['{CurrentSelectedEvent.Name}'] copied to clipboard.");
+                return true;
+            }
 
+            // 2. 상태 노드가 선택되어 있다면 상태 노드 및 해당 상태의 이벤트 전체 복사
+            string? st = CurrentSelectedState;
+            if (!string.IsNullOrEmpty(st) && _profile.States.Contains(st))
+            {
+                var eventsInState = _profile.Events
+                    .Where(e => (MacroEventProfile.IsGlobalState(st) && MacroEventProfile.IsGlobalState(e.StateTag)) ||
+                                (!MacroEventProfile.IsGlobalState(st) && e.StateTag == st))
+                    .ToList();
+
+                _profile.NodePositions.TryGetValue(st, out var pos);
+                _profile.NodeSizes.TryGetValue(st, out var size);
+
+                var envelope = new NodeClipboardEnvelope
+                {
+                    Kind = "State",
+                    StateName = st,
+                    Position = pos != null ? new NodeCanvasPosition(pos.X, pos.Y) : null,
+                    Size = size != null ? new NodeCanvasSize(size.Width, size.Height) : null,
+                    Events = eventsInState
+                };
+                string json = MacroEventProfileManager.SaveToString(envelope);
+                Clipboard.SetText(json);
+                Log(Localization.IsKorean
+                    ? $"📋 상태 노드 ['{st}'] (이벤트 {eventsInState.Count}개) 클립보드 복사 완료"
+                    : $"📋 State Node ['{st}'] ({eventsInState.Count} events) copied to clipboard.");
+                return true;
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 클립보드에서 노드/이벤트를 붙여넣고 Undo/Redo 스냅샷을 생성합니다.
+    /// 유효한 노드 데이터가 아닌 일반 텍스트나 다른 정보일 경우 에러 없이 안전하게 무시합니다.
+    /// 모든 뷰 모드(캔버스, 핀그래프, 클래식 트리/리스트)에서 완벽히 지원됩니다.
+    /// </summary>
+    public bool PasteFromClipboard()
+    {
+        try
+        {
+            if (!Clipboard.ContainsText()) return false;
+            string text = Clipboard.GetText();
+            if (string.IsNullOrWhiteSpace(text) || !text.Contains(NodeClipboardEnvelope.MagicHeader))
+            {
+                return false; // 다른 일반 텍스트나 알 수 없는 정보는 조용히 무시
+            }
+
+            var envelope = System.Text.Json.JsonSerializer.Deserialize<NodeClipboardEnvelope>(text, MacroEventProfileManager.JsonOptions);
+            if (envelope == null || envelope.Header != NodeClipboardEnvelope.MagicHeader)
+            {
+                return false;
+            }
+
+            bool ko = Localization.IsKorean;
+
+            // 1. 단일 이벤트 붙여넣기
+            if (envelope.Kind == "Event" && envelope.SingleEvent != null)
+            {
+                string targetState = CurrentSelectedState ?? _profile.InitialState ?? "기본 상태";
+                var cloneEvt = CloneEvent(envelope.SingleEvent, targetState);
+
+                RecordUndo(ko ? $"이벤트 붙여넣기 [{cloneEvt.Name}]" : $"Paste Event [{cloneEvt.Name}]");
+                _profile.Events.Add(cloneEvt);
+                _isDirty = true;
+                SyncAndRefreshAllViews();
+                OnCanvasSelectionChanged(targetState, cloneEvt);
+
+                Log(ko
+                    ? $"📥 클립보드에서 이벤트 ['{cloneEvt.Name}']을(를) '{targetState}'에 붙여넣었습니다."
+                    : $"📥 Pasted event ['{cloneEvt.Name}'] into '{targetState}'.");
+                return true;
+            }
+
+            // 2. 상태 노드 (및 소속 이벤트 전체) 붙여넣기
+            if (envelope.Kind == "State" && !string.IsNullOrWhiteSpace(envelope.StateName))
+            {
+                string baseName = envelope.StateName;
+                if (MacroEventProfile.IsGlobalState(baseName))
+                {
+                    baseName = ko ? "복사된 전역 상태" : "Copied Global State";
+                }
+
+                // 중복되지 않는 고유한 상태 이름 자동 생성
+                string newStateName = GenerateUniqueStateName(baseName);
+
+                // 안전한 노드 스폰 좌표 자동 탐색 (기존 노드와의 겹침 0% 보장)
+                float prefX = envelope.Position != null ? envelope.Position.X + 40f : 300f;
+                float prefY = envelope.Position != null ? envelope.Position.Y + 40f : 150f;
+                var safePos = MacroLayoutEngine.FindSafeSpawnPosition(_profile, prefX, prefY);
+
+                RecordUndo(ko ? $"상태 노드 붙여넣기 [{newStateName}]" : $"Paste State Node [{newStateName}]");
+
+                _profile.States.Add(newStateName);
+                _profile.NodePositions[newStateName] = safePos;
+                if (envelope.Size != null)
+                {
+                    _profile.NodeSizes[newStateName] = new NodeCanvasSize(envelope.Size.Width, envelope.Size.Height);
+                }
+
+                int eventCount = 0;
+                MacroEvent? firstClonedEvt = null;
+                foreach (var origEvt in envelope.Events)
+                {
+                    var cloneEvt = CloneEvent(origEvt, newStateName);
+                    _profile.Events.Add(cloneEvt);
+                    firstClonedEvt ??= cloneEvt;
+                    eventCount++;
+                }
+
+                _isDirty = true;
+                SyncAndRefreshAllViews();
+                OnCanvasSelectionChanged(newStateName, firstClonedEvt);
+
+                Log(ko
+                    ? $"📥 클립보드에서 상태 노드 ['{newStateName}'] (이벤트 {eventCount}개)을(를) 붙여넣었습니다."
+                    : $"📥 Pasted state node ['{newStateName}'] with {eventCount} events.");
+                return true;
+            }
+
+            return false;
+        }
+        catch
+        {
+            // 그 외의 형식 파싱 실패 시 예외 없이 안전하게 무시
+            return false;
+        }
+    }
+
+    private static MacroEvent CloneEvent(MacroEvent source, string targetStateTag)
+    {
+        string json = System.Text.Json.JsonSerializer.Serialize(source, MacroEventProfileManager.JsonOptions);
+        var clone = System.Text.Json.JsonSerializer.Deserialize<MacroEvent>(json, MacroEventProfileManager.JsonOptions) ?? new MacroEvent();
+        clone.Id = Guid.NewGuid().ToString();
+        clone.StateTag = targetStateTag;
+        return clone;
+    }
+
+    private string GenerateUniqueStateName(string baseName)
+    {
+        string candidate = $"{baseName} (복사)";
+        if (!_profile.States.Contains(candidate)) return candidate;
+
+        int num = 2;
+        while (_profile.States.Contains($"{baseName} (복사 {num})"))
+        {
+            num++;
+        }
+        return $"{baseName} (복사 {num})";
+    }
 }

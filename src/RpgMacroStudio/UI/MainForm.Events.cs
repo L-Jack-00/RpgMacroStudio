@@ -21,6 +21,12 @@ public partial class MainForm
         menu.Items.Add(Localization.Get("MenuAddEvent"), null, (s, e) => AddNewEventToSelectedState());
         menu.Items.Add(new ToolStripSeparator());
 
+        var copyItem = new ToolStripMenuItem(Localization.IsKorean ? "📋 노드/이벤트 복사 (Ctrl+C)" : "📋 Copy Selection (Ctrl+C)", null, (s, e) => CopyCurrentSelectionToClipboard());
+        var pasteItem = new ToolStripMenuItem(Localization.IsKorean ? "📥 노드/이벤트 붙여넣기 (Ctrl+V)" : "📥 Paste (Ctrl+V)", null, (s, e) => PasteFromClipboard());
+        menu.Items.Add(copyItem);
+        menu.Items.Add(pasteItem);
+        menu.Items.Add(new ToolStripSeparator());
+
         var toggleEnableItem = new ToolStripMenuItem(Localization.IsKorean ? "⚡ 이벤트 활성 / 비활성화 (Space)" : "⚡ Toggle Event Enabled (Space)");
         toggleEnableItem.Click += (s, e) =>
         {
@@ -56,6 +62,12 @@ public partial class MainForm
         _isUpdatingUi = true;
         try
         {
+            if (!IsClassicMode)
+            {
+                _canvas.SelectedState = stateName;
+                _canvas.SelectedEvent = evt;
+            }
+
             bool hasState = !string.IsNullOrEmpty(stateName);
             bool isFixedState = !hasState || MacroEventProfile.IsGlobalState(stateName) || MacroEventProfile.IsDefaultState(stateName);
 

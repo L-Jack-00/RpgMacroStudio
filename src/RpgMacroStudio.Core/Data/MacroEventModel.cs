@@ -449,3 +449,19 @@ public class NodeCanvasSize
         Height = height;
     }
 }
+
+/// <summary>
+/// 노드 및 이벤트 복사/붙여넣기용 클립보드 데이터 모델입니다.
+/// </summary>
+public class NodeClipboardEnvelope
+{
+    public const string MagicHeader = "RpgMacroStudio.NodePayload.v5";
+
+    public string Header { get; set; } = MagicHeader;
+    public string Kind { get; set; } = "State"; // "State" or "Event"
+    public string? StateName { get; set; }
+    public NodeCanvasPosition? Position { get; set; }
+    public NodeCanvasSize? Size { get; set; }
+    public List<MacroEvent> Events { get; set; } = new();
+    public MacroEvent? SingleEvent { get; set; }
+}

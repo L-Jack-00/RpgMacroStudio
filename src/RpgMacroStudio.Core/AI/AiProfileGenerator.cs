@@ -119,7 +119,7 @@ Return ONLY the raw JSON or a JSON code block (```json ... ```). Do not include 
             if (profile.Events == null || profile.Events.Count == 0)
             {
                 result.Success = false;
-                result.ErrorMessage = "AI가 유효한 매크로 이벤트를 생성하지 못했습니다. (생성된 이벤트가 0건입니다. 요구사항 프롬프트를 좀 더 구체적으로 작성해주세요.)";
+                result.ErrorMessage = "입력하신 시나리오에서 유효한 매크로 이벤트를 생성하지 못했습니다. 원하시는 동작(키 입력, 조건, 상태 전이 등)을 좀 더 구체적으로 설명해 주시면 정밀한 매크로를 설계해 드립니다.";
                 return result;
             }
 

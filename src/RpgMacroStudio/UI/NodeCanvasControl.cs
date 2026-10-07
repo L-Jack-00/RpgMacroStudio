@@ -113,8 +113,8 @@ public partial class NodeCanvasControl : Control
     }
 
     // 선택 상태
-    public string? SelectedState { get; private set; }
-    public MacroEvent? SelectedEvent { get; private set; }
+    public string? SelectedState { get; set; }
+    public MacroEvent? SelectedEvent { get; set; }
 
     public void SelectState(string? state)
     {
@@ -223,6 +223,8 @@ public partial class NodeCanvasControl : Control
     public event Action<string, MacroEvent>? EventDeleteRequested;
     public event Action<string>? AddEventToStateRequested;
     public event Action<MacroEvent>? EventEditRequested;
+    public event Action? CopyRequested;
+    public event Action? PasteRequested;
 
     // 런타임 펄스 애니메이션용 타이머
     private readonly System.Windows.Forms.Timer _animTimer;

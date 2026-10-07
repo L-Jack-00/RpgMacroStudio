@@ -72,6 +72,8 @@ public partial class NodeCanvasControl
 
                         // (3) 이벤트 카드 본체 위 우클릭
                         var evtMenu = new ContextMenuStrip();
+                        evtMenu.Items.Add(ko ? "📋 이벤트 복사 (Ctrl+C)" : "📋 Copy Event (Ctrl+C)", null, (s, e) => CopyRequested?.Invoke());
+                        evtMenu.Items.Add(new ToolStripSeparator());
                         evtMenu.Items.Add(ko ? "➕ 조건 추가" : "➕ Add Trigger", null, (s, e) => TriggerAddRequested?.Invoke(el.Event));
                         evtMenu.Items.Add(ko ? "➕ 행동 추가" : "➕ Add Action", null, (s, e) => ActionAddRequested?.Invoke(el.Event));
                         evtMenu.Items.Add(ko ? "🔴 매크로 녹화" : "🔴 Record Macro", null, (s, e) => RecordMacroRequested?.Invoke(el.Event));
@@ -85,6 +87,9 @@ public partial class NodeCanvasControl
                 // (4) 상태 노드 헤더/몸체 위 우클릭
                 var stateMenu = new ContextMenuStrip();
                 bool isFixed = MacroEventProfile.IsGlobalState(state) || MacroEventProfile.IsDefaultState(state);
+
+                stateMenu.Items.Add(ko ? "📋 상태 노드 복사 (Ctrl+C)" : "📋 Copy State Node (Ctrl+C)", null, (s, e) => CopyRequested?.Invoke());
+                stateMenu.Items.Add(new ToolStripSeparator());
 
                 // 다중 노드 선택 상태인 경우 일괄 삭제 메뉴 제공
                 var multiDeletable = SelectedStates
@@ -124,6 +129,8 @@ public partial class NodeCanvasControl
             string targetState = SelectedState ?? _profile.InitialState;
             AddEventToStateRequested?.Invoke(targetState);
         });
+        canvasMenu.Items.Add(new ToolStripSeparator());
+        canvasMenu.Items.Add(ko ? "📥 노드/이벤트 붙여넣기 (Ctrl+V)" : "📥 Paste (Ctrl+V)", null, (s, e) => PasteRequested?.Invoke());
         canvasMenu.Items.Add(new ToolStripSeparator());
         canvasMenu.Items.Add(Localization.Get("MenuAutoLayout"), null, (s, e) => 
         {
@@ -381,6 +388,13 @@ public partial class NodeCanvasControl
             GraphNodeSelected?.Invoke(hitNode);
             Invalidate();
 
+            // 0. 노드 복사
+            cms.Items.Add(ko ? "📋 노드 복사 (Ctrl+C)" : "📋 Copy Node (Ctrl+C)", null, (s, ev) =>
+            {
+                CopyRequested?.Invoke();
+            });
+            cms.Items.Add(new ToolStripSeparator());
+
             // 1. 노드 편집 (삭제 버튼 위에 추가)
             cms.Items.Add(ko ? $"✏️ 노드 [{hitNode.Title}] 속성/편집" : $"✏️ Edit Node [{hitNode.Title}]", null, (s, ev) =>
             {
@@ -415,6 +429,13 @@ public partial class NodeCanvasControl
             cms.Items.Add(ko ? "🔄 새 상태 전환 노드 추가" : "🔄 Add Change State Node", null, (s, ev) =>
             {
                 AddPinGraphActionNode(ActionType.ChangeState, SelectedState, worldPt);
+            });
+
+            cms.Items.Add(new ToolStripSeparator());
+
+            cms.Items.Add(ko ? "📥 노드/이벤트 붙여넣기 (Ctrl+V)" : "📥 Paste (Ctrl+V)", null, (s, ev) =>
+            {
+                PasteRequested?.Invoke();
             });
 
             cms.Items.Add(new ToolStripSeparator());

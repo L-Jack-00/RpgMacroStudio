@@ -437,16 +437,47 @@ public class AiAssistantDialog : Form
         _btnApplyToCanvas = new Button
         {
             Text = Localization.Get("AiApplyToCanvas"),
-            Width = 240,
-            Height = 34,
-            Location = new Point(20, 8),
+            Width = 260,
+            Height = 36,
+            Location = new Point(20, 7),
             BackColor = Color.FromArgb(39, 174, 96),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
-            Font = AppFontHelper.GetEmojiFont(10f, FontStyle.Bold),
+            Font = AppFontHelper.GetEmojiFont(10.5f, FontStyle.Bold),
             Enabled = false,
             Cursor = Cursors.Hand
         };
+        _btnApplyToCanvas.FlatAppearance.BorderSize = 0;
+        _btnApplyToCanvas.FlatAppearance.MouseOverBackColor = Color.FromArgb(46, 204, 113);
+        _btnApplyToCanvas.FlatAppearance.MouseDownBackColor = Color.FromArgb(30, 132, 73);
+
+        // 눈에 확 띄는 선명한 에메랄드 녹색 및 활성화 테두리 하이라이트 커스텀 렌더링
+        _btnApplyToCanvas.Paint += (s, e) =>
+        {
+            var btn = (Button)s!;
+            var g = e.Graphics;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            Color bg = btn.Enabled
+                ? (btn.ClientRectangle.Contains(btn.PointToClient(Cursor.Position)) ? Color.FromArgb(46, 204, 113) : Color.FromArgb(39, 174, 96))
+                : Color.FromArgb(32, 58, 44);
+            Color fg = btn.Enabled ? Color.White : Color.FromArgb(140, 175, 155);
+
+            using var brush = new SolidBrush(bg);
+            g.FillRectangle(brush, btn.ClientRectangle);
+
+            if (btn.Enabled)
+            {
+                using var pen = new Pen(Color.FromArgb(70, 230, 140), 1.8f);
+                g.DrawRectangle(pen, 1, 1, btn.Width - 2, btn.Height - 2);
+            }
+
+            TextRenderer.DrawText(g, btn.Text, btn.Font, btn.ClientRectangle, fg, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        };
+        _btnApplyToCanvas.MouseEnter += (s, e) => _btnApplyToCanvas.Invalidate();
+        _btnApplyToCanvas.MouseLeave += (s, e) => _btnApplyToCanvas.Invalidate();
+        _btnApplyToCanvas.EnabledChanged += (s, e) => _btnApplyToCanvas.Invalidate();
+
         _btnApplyToCanvas.Click += (s, e) =>
         {
             if (GeneratedProfile != null)
@@ -781,8 +812,8 @@ public class AiAssistantDialog : Form
                 GeneratedProfile = result.Profile;
                 var p = result.Profile;
                 _lblStatus.Text = Localization.IsKorean
-                    ? $"🎉 설계 완료 (상태 {p.States.Count}개, 이벤트 {p.Events.Count}개, {elapsedSec}초) ➔ 아래 [🚀 적용] 버튼 클릭"
-                    : $"🎉 Generated ({p.States.Count} states, {p.Events.Count} events, {elapsedSec}s) ➔ Click [Apply] below";
+                    ? $"✅ 프로필 설계 완료 (상태 {p.States.Count}개, 이벤트 {p.Events.Count}개) ➔ 아래 [🚀 현재 캔버스에 즉시 적용]을 눌러주세요."
+                    : $"✅ Generation Complete ({p.States.Count} states, {p.Events.Count} events) ➔ Click [🚀 Apply Directly to Canvas] below.";
                 _lblStatus.ForeColor = Color.FromArgb(39, 174, 96);
 
                 // 요약 표시
@@ -831,10 +862,12 @@ public class AiAssistantDialog : Form
             string errMsg = ex.Message;
             if (ex is TimeoutException || errMsg.Contains("Timeout") || errMsg.Contains("canceled"))
             {
-                errMsg = "구글 AI 서버 응답 시간이 초과되었습니다.\n\n해결 팁:\n1. 모델을 가장 빠른 'gemini-2.0-flash'로 선택하세요.\n2. 화면 캡처 이미지를 제거하거나 재시도해보세요.\n3. 인터넷 연결 상태를 확인해주세요.";
+                errMsg = Localization.IsKorean
+                    ? "AI 서버의 응답 대기 시간이 초과되었습니다.\n\n안내 사항:\n1. 네트워크 연결 상태를 확인하거나 잠시 후 다시 시도해 주세요.\n2. 화면 캡처 이미지가 첨부되어 있다면 이미지를 제거하고 시도해 보세요.\n3. 다른 모델이나 API 제공자를 선택해 보세요."
+                    : "AI server response timed out.\n\nTips:\n1. Check your network connection and retry shortly.\n2. Remove attached screenshot and try text-only.\n3. Select a different model or provider.";
             }
 
-            _lblStatus.Text = $"❌ 서버 응답 시간 초과 ({elapsedSec}초)";
+            _lblStatus.Text = Localization.IsKorean ? "❌ 서버 응답 시간 초과" : "❌ Server Response Timed Out";
             _lblStatus.ForeColor = Color.FromArgb(192, 57, 43);
             MessageBox.Show(errMsg, "AI Server Timeout", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }

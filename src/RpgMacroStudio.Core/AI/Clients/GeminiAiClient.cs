@@ -218,27 +218,27 @@ public class GeminiAiClient : IAiProviderClient
 
                 if (status == "UNAVAILABLE" || statusCode == 503 || msg.Contains("overloaded", StringComparison.OrdinalIgnoreCase))
                 {
-                    return "구글 Gemini 무료 서버가 전 세계 트래픽 폭주로 일시적 과부하(503 UNAVAILABLE) 상태입니다.\n(프로그램 오류가 아니며 구글 자체 서버 혼잡입니다.)\n\n💡 해결 방법:\n1. 1~2분 뒤 다시 시도하시거나\n2. 'gemini-1.5-flash' 또는 'gemini-1.5-flash-8b'를 시도해보세요.\n3. 즉시 테스트하려면 프로바이더를 '[테스트 하네스] Mock 엔진'으로 변경해보세요.";
+                    return "AI 제공자 서버가 일시적인 과부하(503) 상태입니다.\n\n잠시 후 다시 시도해 주시거나, 다른 모델 또는 API 제공자를 선택해 주세요.";
                 }
 
                 if (status == "RESOURCE_EXHAUSTED" || statusCode == 429)
                 {
-                    return "구글 API 사용량 한도(쿼터)를 일시적으로 초과했습니다.\n(무료 티어는 분당 15회 제한이 있습니다. 1분 후 다시 시도해주세요.)";
+                    return "API 호출 허용 한도(쿼터)를 일시적으로 초과했습니다.\n\n잠시 후(약 1분 뒤) 다시 시도해 주세요.";
                 }
 
                 if (status == "NOT_FOUND" || statusCode == 404 || msg.Contains("not found", StringComparison.OrdinalIgnoreCase) || msg.Contains("not supported", StringComparison.OrdinalIgnoreCase))
                 {
-                    return $"선택하신 모델은 현재 API 버전이나 해당 구글 계정에서 지원되지 않는 모델입니다.\n(사유: {msg})\n\n💡 'gemini-1.5-flash' 또는 'gemini-1.5-pro'를 선택해보세요.";
+                    return $"선택하신 모델은 해당 API 계정에서 지원되지 않거나 모델명이 잘못되었습니다.\n(사유: {msg})\n\n[🔄 최신 모델 목록 가져오기]를 눌러 지원되는 모델을 선택해 주세요.";
                 }
 
                 if (status == "PERMISSION_DENIED" || statusCode == 403)
                 {
-                    return $"구글 API 키 권한 오류입니다. (신규 계정 프로젝트 권한 또는 제한된 모델)\n(세부 내용: {msg})";
+                    return $"API 키 인증 또는 권한 오류가 발생했습니다.\n(세부 내용: {msg})\n\n입력하신 API 키가 유효한지 확인해 주세요.";
                 }
 
                 if (!string.IsNullOrWhiteSpace(msg))
                 {
-                    return $"구글 Gemini 서버 오류 ({status}): {msg}";
+                    return $"AI 서버 응답 오류 ({status}): {msg}";
                 }
             }
         }

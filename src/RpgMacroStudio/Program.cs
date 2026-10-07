@@ -322,8 +322,11 @@ internal static class Program
 
     private static bool TestDarkThemeAndScrollbarIntegrity()
     {
+        string prevTheme = AppSettings.Current.ThemeMode;
         try
         {
+            AppSettings.Current.ThemeMode = "Dark";
+
             // 1. 패치노트 다이얼로그(ChangelogDialog) 테마 및 스크롤바 도킹 무결성 검증
             using var changelogDlg = new ChangelogDialog();
             var chHandle = changelogDlg.Handle;
@@ -374,6 +377,10 @@ internal static class Program
         {
             Console.WriteLine($"  ❌ [예외] 다크모드 및 스크롤바 무결성 테스트 오류: {ex}");
             return false;
+        }
+        finally
+        {
+            AppSettings.Current.ThemeMode = prevTheme;
         }
     }
 }

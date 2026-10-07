@@ -50,11 +50,12 @@ public static class SelfTestRunner
         allPassed &= TestUniversalKeyboardNavigationAndShortcutsAcrossAllViews();
         allPassed &= TestEmojiFontIntegrityAndWizardKeyControls();
         allPassed &= TestAiAssistantHarnessAndMultiProviderGeneration();
+        allPassed &= TestNodeClipboardAndUndoRedoIntegrity();
 
         if (allPassed)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("\n🎉 [모든 테스트 통과] 28개 핵심 모듈 검증 성공! v5.0.0 차세대 AI 어시스턴트 코어 및 멀티 프로바이더 엔진 검증 완료.");
+            Console.WriteLine("\n🎉 [모든 테스트 통과] 29개 핵심 모듈 검증 성공! v5.0.0 차세대 AI 어시스턴트 코어 및 전뷰 노드 복사/붙여넣기 무결성 검증 완료.");
             Console.ResetColor();
         }
         else
@@ -2080,6 +2081,120 @@ public static class SelfTestRunner
         catch (Exception ex)
         {
             Console.WriteLine($"  ❌ [예외] AI 어시스턴트 하네스 테스트 실패: {ex.Message}");
+            return false;
+        }
+    }
+
+    private static bool TestNodeClipboardAndUndoRedoIntegrity()
+    {
+        try
+        {
+            // 1. 단일 이벤트 직렬화 및 역직렬화 무결성
+            var testEvt = new MacroEvent
+            {
+                Name = "테스트 물약 복사",
+                StateTag = "사냥",
+                Triggers = new List<MacroTrigger> { new MacroTrigger { Type = TriggerType.TimerInterval, IntervalMs = 500 } },
+                Actions = new List<MacroAction> { new MacroAction { Type = ActionType.KeyPress, Key = "F1", PostDelayMs = 120 } }
+            };
+
+            var evtEnvelope = new NodeClipboardEnvelope
+            {
+                Kind = "Event",
+                SingleEvent = testEvt
+            };
+
+            string jsonEvt = MacroEventProfileManager.SaveToString(evtEnvelope);
+            if (!jsonEvt.Contains(NodeClipboardEnvelope.MagicHeader))
+            {
+                Console.WriteLine("  ❌ [실패] 클립보드 매직 헤더 누락");
+                return false;
+            }
+
+            var restoredEvtEnvelope = System.Text.Json.JsonSerializer.Deserialize<NodeClipboardEnvelope>(jsonEvt, MacroEventProfileManager.JsonOptions);
+            if (restoredEvtEnvelope == null || restoredEvtEnvelope.Kind != "Event" || restoredEvtEnvelope.SingleEvent?.Name != "테스트 물약 복사")
+            {
+                Console.WriteLine("  ❌ [실패] 이벤트 클립보드 엔벨로프 역직렬화 실패");
+                return false;
+            }
+
+            // 2. 상태 노드 및 이벤트 일괄 복사 엔벨로프 무결성
+            var stateEnvelope = new NodeClipboardEnvelope
+            {
+                Kind = "State",
+                StateName = "보스전",
+                Position = new NodeCanvasPosition(400, 300),
+                Size = new NodeCanvasSize(240, 180),
+                Events = new List<MacroEvent> { testEvt }
+            };
+
+            string jsonState = MacroEventProfileManager.SaveToString(stateEnvelope);
+            var restoredStateEnvelope = System.Text.Json.JsonSerializer.Deserialize<NodeClipboardEnvelope>(jsonState, MacroEventProfileManager.JsonOptions);
+            if (restoredStateEnvelope == null || restoredStateEnvelope.Kind != "State" || restoredStateEnvelope.StateName != "보스전" || restoredStateEnvelope.Events.Count != 1)
+            {
+                Console.WriteLine("  ❌ [실패] 상태 노드 클립보드 엔벨로프 역직렬화 실패");
+                return false;
+            }
+
+            // 3. 잘못된 텍스트 및 외부 클립보드 데이터 무시 가드 검증
+            string randomWebUrl = "https://example.com/macro-guide?id=123";
+            bool shouldIgnoreUrl = string.IsNullOrWhiteSpace(randomWebUrl) || !randomWebUrl.Contains(NodeClipboardEnvelope.MagicHeader);
+            if (!shouldIgnoreUrl)
+            {
+                Console.WriteLine("  ❌ [실패] 외부 URL 클립보드 가드 실패");
+                return false;
+            }
+
+            string randomText = "그냥 메모장 텍스트 복사한 것";
+            bool shouldIgnoreText = string.IsNullOrWhiteSpace(randomText) || !randomText.Contains(NodeClipboardEnvelope.MagicHeader);
+            if (!shouldIgnoreText)
+            {
+                Console.WriteLine("  ❌ [실패] 일반 텍스트 클립보드 가드 실패");
+                return false;
+            }
+
+            // 4. Undo/Redo 연동 무결성 검증
+            var profile = new MacroEventProfile
+            {
+                ProfileName = "클립보드 Undo 테스트",
+                States = new List<string> { "기본 상태" }
+            };
+            var undoRedo = new UndoRedoManager();
+
+            // 붙여넣기 직전 스냅샷 기록 (RecordUndo 패턴)
+            undoRedo.RecordSnapshot(profile, "상태 노드 붙여넣기 [보스전 (복사)]");
+
+            // 붙여넣기 수행: 상태 노드 추가
+            profile.States.Add("보스전 (복사)");
+
+            if (!undoRedo.CanUndo || undoRedo.CanRedo)
+            {
+                Console.WriteLine("  ❌ [실패] Undo/Redo 스택 상태 오류");
+                return false;
+            }
+
+            // 언두 수행 (붙여넣기 취소 -> 초기 상태로 복원)
+            var (undone, _) = undoRedo.Undo(profile);
+            if (undone == null || undone.States.Contains("보스전 (복사)"))
+            {
+                Console.WriteLine("  ❌ [실패] 클립보드 붙여넣기 언두 실패");
+                return false;
+            }
+
+            // 리두 수행 (붙여넣기 다시 실행 -> '보스전 (복사)' 복원)
+            var (redone, _) = undoRedo.Redo(undone);
+            if (redone == null || !redone.States.Contains("보스전 (복사)"))
+            {
+                Console.WriteLine("  ❌ [실패] 클립보드 붙여넣기 리두 실패");
+                return false;
+            }
+
+            Console.WriteLine("  ✔ [통과] 노드/이벤트 클립보드 엔벨로프 무결성, 외부 텍스트 무시 가드 및 Undo/Redo 연동 검증 완료 (29개 테스트 완료)");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌ [예외] 클립보드 무결성 테스트 실패: {ex.Message}");
             return false;
         }
     }

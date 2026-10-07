@@ -177,12 +177,22 @@ public static class MacroEventProfileManager
                elem.TryGetProperty("profileName", out _);
     }
 
+    public static JsonSerializerOptions JsonOptions => _jsonOptions;
+
     /// <summary>
-    /// 프로필을 JSON 문자열로 직렬화합니다.
+    /// 프로필 또는 임의의 객체를 JSON 문자열로 직렬화합니다.
     /// </summary>
     public static string SaveToString(MacroEventProfile profile)
     {
         return JsonSerializer.Serialize(profile, _jsonOptions);
+    }
+
+    /// <summary>
+    /// 임의의 객체를 공용 JSON 옵션으로 직렬화합니다.
+    /// </summary>
+    public static string SaveToString<T>(T obj)
+    {
+        return JsonSerializer.Serialize(obj, _jsonOptions);
     }
 
     /// <summary>
