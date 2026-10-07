@@ -1181,7 +1181,36 @@ public static class SelfTestRunner
                 }
             }
 
-            Console.WriteLine("  ✔ [통과] FSM 스마트 Auto-Layout 위상 흐름 및 노드 겹침 0% 무결성 검증 성공");
+            // 4. 순환 전이(A <-> B 상호 전이 및 사이클) 무한 루프 방어 및 초고속 완료 검증
+            var cyclicProfile = new MacroEventProfile
+            {
+                States = new List<string> { "Global", "사냥 상태", "마을 상점 상태", "보스전 상태" },
+                InitialState = "사냥 상태"
+            };
+            // 사냥 상태 -> 마을 상점 상태
+            var huntToTown = new MacroEvent { StateTag = "사냥 상태", Name = "귀환" };
+            huntToTown.Actions.Add(new MacroAction { Type = ActionType.ChangeState, TargetState = "마을 상점 상태" });
+            cyclicProfile.Events.Add(huntToTown);
+            // 마을 상점 상태 -> 사냥 상태 (순환 Cycle!)
+            var townToHunt = new MacroEvent { StateTag = "마을 상점 상태", Name = "사냥터 복귀" };
+            townToHunt.Actions.Add(new MacroAction { Type = ActionType.ChangeState, TargetState = "사냥 상태" });
+            cyclicProfile.Events.Add(townToHunt);
+            // 보스전 상태 -> 사냥 상태
+            var bossToHunt = new MacroEvent { StateTag = "보스전 상태", Name = "보스 클리어" };
+            bossToHunt.Actions.Add(new MacroAction { Type = ActionType.ChangeState, TargetState = "사냥 상태" });
+            cyclicProfile.Events.Add(bossToHunt);
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            MacroLayoutEngine.ComputeSmartLayout(cyclicProfile);
+            sw.Stop();
+
+            if (sw.ElapsedMilliseconds > 500 || cyclicProfile.NodePositions.Count < 4)
+            {
+                Console.WriteLine($"  ❌ [실패] 순환 전이 FSM 레이아웃 계산 지연 또는 누락: {sw.ElapsedMilliseconds}ms, 노드수: {cyclicProfile.NodePositions.Count}");
+                return false;
+            }
+
+            Console.WriteLine($"  ✔ [통과] FSM 스마트 Auto-Layout 위상 흐름, 순환 전이 무한루프 방어({sw.ElapsedMilliseconds}ms) 및 노드 겹침 0% 무결성 검증 성공");
             return true;
         }
         catch (Exception ex)

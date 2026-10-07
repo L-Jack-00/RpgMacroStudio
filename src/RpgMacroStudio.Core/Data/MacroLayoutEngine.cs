@@ -74,12 +74,8 @@ public static class MacroLayoutEngine
                     foreach (var target in targets)
                     {
                         if (MacroEventProfile.IsGlobalState(target)) continue;
-                        if (!columnMap.TryGetValue(target, out int existingCol))
-                        {
-                            columnMap[target] = nextCol;
-                            queue.Enqueue(target);
-                        }
-                        else if (existingCol < nextCol)
+                        // 순환 전이(A -> B -> A)가 있는 실제 FSM 그래프에서도 무한 루프가 발생하지 않도록 기방문 상태 재큐잉 차단
+                        if (!columnMap.ContainsKey(target))
                         {
                             columnMap[target] = nextCol;
                             queue.Enqueue(target);

@@ -92,6 +92,18 @@ public class DarkListView : ListView
         base.OnHandleDestroyed(e);
     }
 
+    private const int WM_STYLECHANGING = 0x007C;
+    private const int GWL_STYLE = -16;
+    private const int WS_VSCROLL = 0x00200000;
+    private const int WS_HSCROLL = 0x00100000;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct STYLESTRUCT
+    {
+        public int styleOld;
+        public int styleNew;
+    }
+
     protected override void WndProc(ref Message m)
     {
         if (m.Msg == WM_ERASEBKGND && m.WParam != IntPtr.Zero)
@@ -103,17 +115,18 @@ public class DarkListView : ListView
             return;
         }
 
-        if (HideNativeScrollBar && (m.Msg == WM_NCPAINT || m.Msg == WM_VSCROLL || m.Msg == WM_HSCROLL))
+        // Windows가 ListView에 WS_VSCROLL / WS_HSCROLL 스타일을 동적 부여하려 할 때 원천 제거
+        // (WM_PAINT/WM_NCPAINT 무한 재귀 및 렉/응답없음 없이 OS 기본 스크롤바 생성을 무부하 차단)
+        if (HideNativeScrollBar && m.Msg == WM_STYLECHANGING && (int)m.WParam == GWL_STYLE)
         {
-            ShowScrollBar(Handle, SB_BOTH, 0);
+            var ss = Marshal.PtrToStructure<STYLESTRUCT>(m.LParam);
+            ss.styleNew &= ~(WS_VSCROLL | WS_HSCROLL);
+            Marshal.StructureToPtr(ss, m.LParam, false);
+            m.Result = IntPtr.Zero;
+            return;
         }
 
         base.WndProc(ref m);
-
-        if (HideNativeScrollBar && (m.Msg == WM_NCPAINT || m.Msg == WM_PAINT))
-        {
-            ShowScrollBar(Handle, SB_BOTH, 0);
-        }
     }
 
     private class HeaderNativeWindow : NativeWindow

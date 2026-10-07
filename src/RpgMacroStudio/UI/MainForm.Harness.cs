@@ -530,7 +530,6 @@ public partial class MainForm
 
             _profile = dlg.GeneratedProfile;
             _canvas.Profile = _profile;
-            _classicControl.Profile = _profile;
 
             if (CurrentViewMode == AppViewMode.CanvasPinGraph)
             {

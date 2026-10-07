@@ -1053,8 +1053,14 @@ public partial class MainForm
     {
         _canvas.PinGraph = PinGraphConverter.FromProfile(_profile);
         _canvas.Invalidate();
-        _classicControl.Profile = _profile;
-        _classicControl.PopulateHierarchicalTable();
+        if (_classicControl.Profile != _profile)
+        {
+            _classicControl.Profile = _profile;
+        }
+        else
+        {
+            _classicControl.PopulateHierarchicalTable();
+        }
     }
 
 
