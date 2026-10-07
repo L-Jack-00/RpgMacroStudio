@@ -20,6 +20,7 @@ public class ClassicViewControl : UserControl
 
     private MacroEventProfile _profile = new();
     private bool _isUpdatingUi = false;
+    private bool _isAdjustingColumns = false;
 
     public MacroEventProfile Profile
     {
@@ -1367,41 +1368,50 @@ public class ClassicViewControl : UserControl
 
     public void AdjustColumnsToFill()
     {
+        if (_isAdjustingColumns) return; // 무한 재귀 및 핑퐁 루프 100% 차단
         if (_lvEvents == null || _lvEvents.Columns.Count < 4) return;
+        if (!_lvEvents.IsHandleCreated || _lvEvents.IsDisposed) return;
+
         int clientW = _lvEvents.ClientSize.Width;
         if (clientW <= 0) return;
 
-        // 고정 컬럼: 상태(Col 1: 68px), 분류(Col 2: 92px)
-        int wStatus = 68;
-        int wCategory = 92;
-        int fixedW = wStatus + wCategory;
-
-        // 가변 컬럼 분배: 항목/계층 구조(Col 0)와 상세 내용(Col 3)이 100% 비례 적응하여 가로 스크롤바 0% 보장
-        int available = clientW - fixedW;
-        if (available > 200)
+        _isAdjustingColumns = true;
+        try
         {
-            // 계층 구조에 약 40%, 상세 내용에 나머지 60%
-            int wHierarchy = Math.Max(180, (int)(available * 0.40f));
-            int wDetail = available - wHierarchy;
+            // 고정 컬럼: 상태(Col 1: 68px), 분류(Col 2: 92px)
+            int wStatus = 68;
+            int wCategory = 92;
+            int fixedW = wStatus + wCategory;
 
-            _lvEvents.Columns[0].Width = wHierarchy;
-            _lvEvents.Columns[1].Width = wStatus;
-            _lvEvents.Columns[2].Width = wCategory;
-            _lvEvents.Columns[3].Width = Math.Max(80, wDetail);
-        }
-        else
-        {
-            int wHierarchy = Math.Max(120, available / 2);
-            int wDetail = Math.Max(60, available - wHierarchy);
-            _lvEvents.Columns[0].Width = wHierarchy;
-            _lvEvents.Columns[1].Width = wStatus;
-            _lvEvents.Columns[2].Width = wCategory;
-            _lvEvents.Columns[3].Width = wDetail;
-        }
+            // 가로 스크롤바가 생기지 않도록 4픽셀의 안전 마진(-4)을 확보
+            int available = Math.Max(200, clientW - fixedW - 4);
 
-        if (_lvEvents.IsHandleCreated)
-        {
+            int wHierarchy;
+            int wDetail;
+
+            if (available > 200)
+            {
+                // 계층 구조에 약 40%, 상세 내용에 나머지 60%
+                wHierarchy = Math.Max(180, (int)(available * 0.40f));
+                wDetail = Math.Max(80, available - wHierarchy);
+            }
+            else
+            {
+                wHierarchy = Math.Max(120, available / 2);
+                wDetail = Math.Max(60, available - wHierarchy);
+            }
+
+            // 불필요한 Windows 레이아웃 메시지 재발생을 막기 위해 값이 달라졌을 때만 1회 대입
+            if (_lvEvents.Columns[0].Width != wHierarchy) _lvEvents.Columns[0].Width = wHierarchy;
+            if (_lvEvents.Columns[1].Width != wStatus) _lvEvents.Columns[1].Width = wStatus;
+            if (_lvEvents.Columns[2].Width != wCategory) _lvEvents.Columns[2].Width = wCategory;
+            if (_lvEvents.Columns[3].Width != wDetail) _lvEvents.Columns[3].Width = wDetail;
+
             try { ShowScrollBar(_lvEvents.Handle, SB_HORZ, 0); } catch { }
+        }
+        finally
+        {
+            _isAdjustingColumns = false;
         }
     }
 

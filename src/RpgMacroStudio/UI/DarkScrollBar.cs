@@ -304,33 +304,38 @@ public class DarkScrollBar : Control
     /// </summary>
     public void UpdateMetrics()
     {
-        if (_attachedLb != null && _attachedLb.IsHandleCreated && !_attachedLb.IsDisposed)
+        if (_isSyncing) return;
+        _isSyncing = true;
+        try
         {
-            ShowScrollBar(_attachedLb.Handle, SB_VERT, false);
-            int totalItems = _attachedLb.Items.Count;
-            int itemH = Math.Max(1, _attachedLb.ItemHeight);
-            int visibleItems = Math.Max(1, _attachedLb.ClientSize.Height / itemH);
+            if (_attachedLb != null && _attachedLb.IsHandleCreated && !_attachedLb.IsDisposed)
+            {
+                ShowScrollBar(_attachedLb.Handle, SB_VERT, false);
+                int totalItems = _attachedLb.Items.Count;
+                int itemH = Math.Max(1, _attachedLb.ItemHeight);
+                int visibleItems = Math.Max(1, _attachedLb.ClientSize.Height / itemH);
 
-            Maximum = Math.Max(0, totalItems - visibleItems);
-            LargeChange = visibleItems;
+                Maximum = Math.Max(0, totalItems - visibleItems);
+                LargeChange = visibleItems;
 
-            _isSyncing = true;
-            Value = _attachedLb.TopIndex;
-            _isSyncing = false;
+                Value = _attachedLb.TopIndex;
+            }
+            else if (_attachedLv != null && _attachedLv.IsHandleCreated && !_attachedLv.IsDisposed)
+            {
+                ShowScrollBar(_attachedLv.Handle, SB_VERT, false);
+                int totalItems = _attachedLv.Items.Count;
+                int countPerPage = (int)SendMessage(_attachedLv.Handle, LVM_GETCOUNTPERPAGE, IntPtr.Zero, IntPtr.Zero);
+                countPerPage = Math.Max(1, countPerPage);
+
+                Maximum = Math.Max(0, totalItems - countPerPage);
+                LargeChange = countPerPage;
+
+                int topIndex = (int)SendMessage(_attachedLv.Handle, LVM_GETTOPINDEX, IntPtr.Zero, IntPtr.Zero);
+                Value = topIndex;
+            }
         }
-        else if (_attachedLv != null && _attachedLv.IsHandleCreated && !_attachedLv.IsDisposed)
+        finally
         {
-            ShowScrollBar(_attachedLv.Handle, SB_VERT, false);
-            int totalItems = _attachedLv.Items.Count;
-            int countPerPage = (int)SendMessage(_attachedLv.Handle, LVM_GETCOUNTPERPAGE, IntPtr.Zero, IntPtr.Zero);
-            countPerPage = Math.Max(1, countPerPage);
-
-            Maximum = Math.Max(0, totalItems - countPerPage);
-            LargeChange = countPerPage;
-
-            int topIndex = (int)SendMessage(_attachedLv.Handle, LVM_GETTOPINDEX, IntPtr.Zero, IntPtr.Zero);
-            _isSyncing = true;
-            Value = topIndex;
             _isSyncing = false;
         }
     }
