@@ -1,0 +1,21 @@
+## Visual Studio / .NET 컴파일 산출물 및 임시 파일
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+.vs/
+.vscode/
+
+## Visual Studio 사용자 개인 설정
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## 임시 파일 및 로그
+*.log
+test_output.txt
+watchdog_state.json
+
+## 빌드 릴리즈 배포 패키지 (언제든 build_release.py로 재생성 가능)
+release/

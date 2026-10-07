@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+
+    <AssemblyName>RpgMacroStudio</AssemblyName>
+    <AssemblyTitle>RPG 매크로 스튜디오</AssemblyTitle>
+    <Product>RPG 매크로 스튜디오 (RPG Macro Studio)</Product>
+    <Description>RPG 매크로 스튜디오 실행 런처</Description>
+    <Company>L. Jack</Company>
+    <Authors>L. Jack</Authors>
+    <Copyright>Copyright © 2026 L. Jack. All rights reserved.</Copyright>
+
+    <Version>5.0.0</Version>
+    <AssemblyVersion>5.0.0</AssemblyVersion>
+    <FileVersion>5.0.0</FileVersion>
+    <ApplicationIcon>app_icon.ico</ApplicationIcon>
+
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+</Project>

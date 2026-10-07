@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    
+    <AssemblyName>RpgMacroStudio</AssemblyName>
+    <AssemblyTitle>RPG 매크로 스튜디오</AssemblyTitle>
+    <Product>RPG 매크로 스튜디오 (RPG Macro Studio)</Product>
+    <Description>시각적 노드 그래프 및 클래식 듀얼 뷰 FSM 매크로 스튜디오</Description>
+    <Company>L. Jack</Company>
+    <Authors>L. Jack</Authors>
+    <Copyright>Copyright © 2026 L. Jack. All rights reserved.</Copyright>
+    <NeutralLanguage>ko-KR</NeutralLanguage>
+
+    <Version>5.0.0</Version>
+    <AssemblyVersion>5.0.0</AssemblyVersion>
+    <FileVersion>5.0.0</FileVersion>
+    <ApplicationIcon>app_icon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RpgMacroStudio.Core\RpgMacroStudio.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260627" />
+    <PackageReference Include="OpenCvSharp4.Extensions" Version="4.13.0.20260627" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260627" />
+  </ItemGroup>
+
+</Project>
