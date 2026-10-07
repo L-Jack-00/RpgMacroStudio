@@ -15,6 +15,15 @@ public class DarkListView : ListView
     private const int LVM_GETHEADER = 0x101F;
     private const int WM_ERASEBKGND = 0x0014;
     private const int WM_PAINT = 0x000F;
+    private const int WM_NCPAINT = 0x0085;
+    private const int WM_VSCROLL = 0x0115;
+    private const int WM_HSCROLL = 0x0114;
+    private const int SB_BOTH = 3;
+
+    [DllImport("user32.dll")]
+    private static extern int ShowScrollBar(IntPtr hWnd, int wBar, int bShow);
+
+    public bool HideNativeScrollBar { get; set; } = true;
 
     [DllImport("user32.dll")]
     private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
@@ -39,6 +48,20 @@ public class DarkListView : ListView
         DoubleBuffered = true;
     }
 
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var cp = base.CreateParams;
+            if (HideNativeScrollBar)
+            {
+                cp.Style &= ~0x00200000; // WS_VSCROLL 제거
+                cp.Style &= ~0x00100000; // WS_HSCROLL 제거
+            }
+            return cp;
+        }
+    }
+
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
@@ -52,6 +75,11 @@ public class DarkListView : ListView
             {
                 _headerSubclass?.ReleaseHandle();
                 _headerSubclass = new HeaderNativeWindow(this, hHeader);
+            }
+
+            if (HideNativeScrollBar)
+            {
+                ShowScrollBar(Handle, SB_BOTH, 0);
             }
         }
         catch { }
@@ -74,7 +102,18 @@ public class DarkListView : ListView
             m.Result = (IntPtr)1;
             return;
         }
+
+        if (HideNativeScrollBar && (m.Msg == WM_NCPAINT || m.Msg == WM_VSCROLL || m.Msg == WM_HSCROLL))
+        {
+            ShowScrollBar(Handle, SB_BOTH, 0);
+        }
+
         base.WndProc(ref m);
+
+        if (HideNativeScrollBar && (m.Msg == WM_NCPAINT || m.Msg == WM_PAINT))
+        {
+            ShowScrollBar(Handle, SB_BOTH, 0);
+        }
     }
 
     private class HeaderNativeWindow : NativeWindow
