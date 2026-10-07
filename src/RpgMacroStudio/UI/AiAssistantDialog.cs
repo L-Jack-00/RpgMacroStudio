@@ -760,11 +760,13 @@ public class AiAssistantDialog : Form
             if (result.Success && result.Profile != null)
             {
                 GeneratedProfile = result.Profile;
-                _lblStatus.Text = Localization.Get("AiStatusSuccess");
+                var p = result.Profile;
+                _lblStatus.Text = Localization.IsKorean
+                    ? $"🎉 설계 완료 (상태 {p.States.Count}개, 이벤트 {p.Events.Count}개) ➔ 아래 [🚀 적용] 버튼 클릭"
+                    : $"🎉 Generated ({p.States.Count} states, {p.Events.Count} events) ➔ Click [Apply] below";
                 _lblStatus.ForeColor = Color.FromArgb(39, 174, 96);
 
                 // 요약 표시
-                var p = result.Profile;
                 string summaryText = $"""
 [프로필 기본 정보]
 • 프로필 이름: {p.ProfileName}

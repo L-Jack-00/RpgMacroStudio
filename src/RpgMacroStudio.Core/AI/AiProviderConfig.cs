@@ -112,15 +112,48 @@ public class AiProviderConfig
                     using var doc = JsonDocument.Parse(json);
                     if (doc.RootElement.TryGetProperty("models", out var modelsArr))
                     {
+                        var fetchedGemini = new List<string>();
                         foreach (var m in modelsArr.EnumerateArray())
                         {
+                            // 1. generateContent 미지원 모델(임베딩, 이미지 생성 등) 필터링
+                            if (m.TryGetProperty("supportedGenerationMethods", out var methodsArr))
+                            {
+                                bool canGenerate = false;
+                                foreach (var method in methodsArr.EnumerateArray())
+                                {
+                                    if (method.GetString() == "generateContent")
+                                    {
+                                        canGenerate = true;
+                                        break;
+                                    }
+                                }
+                                if (!canGenerate) continue;
+                            }
+
                             if (m.TryGetProperty("name", out var nameProp))
                             {
                                 string name = nameProp.GetString() ?? "";
                                 if (name.StartsWith("models/")) name = name.Substring("models/".Length);
-                                if (!string.IsNullOrEmpty(name)) resultList.Add(name);
+
+                                // 2. 구형 1.0/레거시/임베딩 제외 및 gemini 모델만 선택
+                                if (!string.IsNullOrEmpty(name) && name.StartsWith("gemini-") && !name.StartsWith("gemini-1.0"))
+                                {
+                                    fetchedGemini.Add(name);
+                                }
                             }
                         }
+
+                        // 3. 안정성 최상위 추천 3종 우선 정렬
+                        var priorityOrder = new[] { "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro" };
+                        foreach (var prio in priorityOrder.Reverse())
+                        {
+                            if (fetchedGemini.Remove(prio))
+                            {
+                                fetchedGemini.Insert(0, prio);
+                            }
+                        }
+
+                        resultList.AddRange(fetchedGemini);
                     }
                 }
             }

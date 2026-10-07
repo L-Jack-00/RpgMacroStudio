@@ -111,14 +111,40 @@ public class GeminiAiClient : IAiProviderClient
                 cObj.TryGetProperty("parts", out var parts) &&
                 parts.GetArrayLength() > 0)
             {
-                var firstPart = parts[0];
-                if (firstPart.TryGetProperty("text", out var textProp))
+                var sb = new StringBuilder();
+                foreach (var part in parts.EnumerateArray())
                 {
-                    return textProp.GetString() ?? "";
+                    if (part.TryGetProperty("text", out var textProp))
+                    {
+                        sb.Append(textProp.GetString());
+                    }
+                }
+
+                string combinedText = sb.ToString();
+                if (!string.IsNullOrWhiteSpace(combinedText))
+                {
+                    return combinedText;
+                }
+            }
+
+            if (firstCandidate.TryGetProperty("finishReason", out var reasonProp))
+            {
+                string reason = reasonProp.GetString() ?? "";
+                if (reason == "SAFETY")
+                {
+                    throw new InvalidOperationException("Gemini 안전성 정책 필터에 의해 생성이 차단되었습니다. 프롬프트 내용을 조정해주세요.");
+                }
+                if (reason == "MAX_TOKENS")
+                {
+                    throw new InvalidOperationException("응답 최대 토큰 한도를 초과하여 생성이 중간에 중단되었습니다.");
+                }
+                if (reason != "STOP" && !string.IsNullOrWhiteSpace(reason))
+                {
+                    throw new InvalidOperationException($"Gemini 응답 비정상 종료 (사유: {reason}). 추천 모델인 'gemini-2.0-flash'를 사용해보세요.");
                 }
             }
         }
 
-        throw new InvalidOperationException($"Gemini 응답 구조 파싱 실패: {responseString}");
+        throw new InvalidOperationException($"Gemini 응답 구조 파싱 실패 (빈 텍스트 응답): {responseString}");
     }
 }

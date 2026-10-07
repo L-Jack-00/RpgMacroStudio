@@ -116,6 +116,13 @@ Return ONLY the raw JSON or a JSON code block (```json ... ```). Do not include 
                 return result;
             }
 
+            if (profile.Events == null || profile.Events.Count == 0)
+            {
+                result.Success = false;
+                result.ErrorMessage = "AI가 유효한 매크로 이벤트를 생성하지 못했습니다. (생성된 이벤트가 0건입니다. 추천 모델 'gemini-2.0-flash'를 사용하거나 프롬프트를 구체화해주세요.)";
+                return result;
+            }
+
             // 필수 상태 점검 및 보정
             if (profile.States == null || profile.States.Count == 0)
             {
