@@ -177,4 +177,73 @@ Return ONLY the raw JSON or a JSON code block (```json ... ```). Do not include 
 
         return text.Trim();
     }
+
+    /// <summary>
+    /// AI Vision API 전송을 위해 고해상도 이미지를 1280px 비율 유지 리사이즈 및 JPEG(품질 80%) 압축합니다.
+    /// (전송 페이로드를 수 MB에서 100~200KB 수준으로 95% 이상 경량화하여 네트워크 타임아웃을 방지합니다.)
+    /// </summary>
+    public static byte[] OptimizeImageForAi(byte[] rawBytes, int maxDimension = 1280, long quality = 80L)
+    {
+        if (rawBytes == null || rawBytes.Length == 0) return Array.Empty<byte>();
+
+        try
+        {
+            using var inMs = new System.IO.MemoryStream(rawBytes);
+            using var origImg = System.Drawing.Image.FromStream(inMs);
+
+            int width = origImg.Width;
+            int height = origImg.Height;
+
+            // 이미 크기가 작다면 리사이즈 없이 원본 반환
+            if (width <= maxDimension && height <= maxDimension && rawBytes.Length < 350 * 1024)
+            {
+                return rawBytes;
+            }
+
+            if (width > maxDimension || height > maxDimension)
+            {
+                double ratio = Math.Min((double)maxDimension / width, (double)maxDimension / height);
+                width = Math.Max(1, (int)(width * ratio));
+                height = Math.Max(1, (int)(height * ratio));
+            }
+
+            using var resizedBmp = new System.Drawing.Bitmap(width, height);
+            using (var g = System.Drawing.Graphics.FromImage(resizedBmp))
+            {
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+                g.DrawImage(origImg, 0, 0, width, height);
+            }
+
+            using var outMs = new System.IO.MemoryStream();
+            var jgpEncoder = GetEncoder(System.Drawing.Imaging.ImageFormat.Jpeg);
+            if (jgpEncoder != null)
+            {
+                using var encParams = new System.Drawing.Imaging.EncoderParameters(1);
+                encParams.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, quality);
+                resizedBmp.Save(outMs, jgpEncoder, encParams);
+            }
+            else
+            {
+                resizedBmp.Save(outMs, System.Drawing.Imaging.ImageFormat.Jpeg);
+            }
+
+            return outMs.ToArray();
+        }
+        catch
+        {
+            return rawBytes;
+        }
+    }
+
+    private static System.Drawing.Imaging.ImageCodecInfo? GetEncoder(System.Drawing.Imaging.ImageFormat format)
+    {
+        var codecs = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders();
+        foreach (var codec in codecs)
+        {
+            if (codec.FormatID == format.Guid) return codec;
+        }
+        return null;
+    }
 }

@@ -661,7 +661,8 @@ public class AiAssistantDialog : Form
 
             using var ms = new MemoryStream();
             bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-            _attachedScreenshotBytes = ms.ToArray();
+            // AI Vision 전송용 고해상도 최적화 (1280px 리사이즈 + JPEG 80% 압축)
+            _attachedScreenshotBytes = AiProfileGenerator.OptimizeImageForAi(ms.ToArray());
 
             _picScreenshotPreview.Image = new Bitmap(bmp);
             _picScreenshotPreview.Visible = true;
@@ -686,7 +687,9 @@ public class AiAssistantDialog : Form
         {
             try
             {
-                _attachedScreenshotBytes = File.ReadAllBytes(ofd.FileName);
+                byte[] raw = File.ReadAllBytes(ofd.FileName);
+                // AI Vision 전송용 고해상도 최적화 (1280px 리사이즈 + JPEG 80% 압축)
+                _attachedScreenshotBytes = AiProfileGenerator.OptimizeImageForAi(raw);
                 using var ms = new MemoryStream(_attachedScreenshotBytes);
                 _picScreenshotPreview.Image = Image.FromStream(ms);
                 _picScreenshotPreview.Visible = true;
@@ -750,6 +753,20 @@ public class AiAssistantDialog : Form
 
         _cts = new CancellationTokenSource();
 
+        // 경과 시간 실시간 타이머
+        int elapsedSec = 0;
+        using var timer = new System.Windows.Forms.Timer { Interval = 1000 };
+        timer.Tick += (s, e) =>
+        {
+            elapsedSec++;
+            if (_isGenerating)
+            {
+                string baseText = Localization.Get("AiStatusGenerating");
+                _lblStatus.Text = $"{baseText} ({elapsedSec}초 경과)";
+            }
+        };
+        timer.Start();
+
         try
         {
             var client = AiProviderClientFactory.CreateClient(cfg);
@@ -757,13 +774,15 @@ public class AiAssistantDialog : Form
 
             var result = await Task.Run(() => generator.GenerateProfileAsync(prompt, _attachedScreenshotBytes, _cts.Token));
 
+            timer.Stop();
+
             if (result.Success && result.Profile != null)
             {
                 GeneratedProfile = result.Profile;
                 var p = result.Profile;
                 _lblStatus.Text = Localization.IsKorean
-                    ? $"🎉 설계 완료 (상태 {p.States.Count}개, 이벤트 {p.Events.Count}개) ➔ 아래 [🚀 적용] 버튼 클릭"
-                    : $"🎉 Generated ({p.States.Count} states, {p.Events.Count} events) ➔ Click [Apply] below";
+                    ? $"🎉 설계 완료 (상태 {p.States.Count}개, 이벤트 {p.Events.Count}개, {elapsedSec}초) ➔ 아래 [🚀 적용] 버튼 클릭"
+                    : $"🎉 Generated ({p.States.Count} states, {p.Events.Count} events, {elapsedSec}s) ➔ Click [Apply] below";
                 _lblStatus.ForeColor = Color.FromArgb(39, 174, 96);
 
                 // 요약 표시
@@ -808,12 +827,20 @@ public class AiAssistantDialog : Form
         }
         catch (Exception ex)
         {
-            _lblStatus.Text = $"❌ 오류: {ex.Message}";
+            timer.Stop();
+            string errMsg = ex.Message;
+            if (ex is TimeoutException || errMsg.Contains("Timeout") || errMsg.Contains("canceled"))
+            {
+                errMsg = "구글 AI 서버 응답 시간이 초과되었습니다.\n\n해결 팁:\n1. 모델을 가장 빠른 'gemini-2.0-flash'로 선택하세요.\n2. 화면 캡처 이미지를 제거하거나 재시도해보세요.\n3. 인터넷 연결 상태를 확인해주세요.";
+            }
+
+            _lblStatus.Text = $"❌ 서버 응답 시간 초과 ({elapsedSec}초)";
             _lblStatus.ForeColor = Color.FromArgb(192, 57, 43);
-            MessageBox.Show(ex.Message, "Exception", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(errMsg, "AI Server Timeout", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         finally
         {
+            timer.Stop();
             _isGenerating = false;
             _btnGenerate.Enabled = true;
         }
