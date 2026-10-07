@@ -1972,7 +1972,69 @@ public static class SelfTestRunner
                 return false;
             }
 
-            // 6. AppSettings AI 설정 영구화 검증
+            // 6. 루트 래퍼 객체 및 대소문자 무시 역직렬화 (OpenAI/OpenRouter/Gemini 호환) 검증
+            string wrappedJson = """
+            {
+              "MacroEventProfile": {
+                "ProfileName": "래핑 테스트 프로필",
+                "Events": [
+                  {
+                    "Name": "래핑 이벤트 1",
+                    "StateTag": "Global",
+                    "Triggers": [{ "Type": "Always" }],
+                    "Actions": [{ "Type": "KeyPress", "Key": "D1" }]
+                  }
+                ]
+              }
+            }
+            """;
+            var unwrappedProfile = MacroEventProfileManager.LoadFromString(wrappedJson);
+            if (unwrappedProfile == null || unwrappedProfile.Events.Count != 1 || unwrappedProfile.Events[0].Name != "래핑 이벤트 1")
+            {
+                Console.WriteLine("  ❌ [실패] 루트 래퍼 객체(MacroEventProfile) 자동 언래핑 역직렬화 실패");
+                return false;
+            }
+
+            string camelCaseJson = """
+            {
+              "macroEventProfile": {
+                "profileName": "카멜케이스 프로필",
+                "events": [
+                  {
+                    "name": "카멜케이스 이벤트",
+                    "stateTag": "Global",
+                    "triggers": [{ "type": "TimerInterval", "intervalMs": 500 }],
+                    "actions": [{ "type": "Wait", "waitDurationMs": 200 }]
+                  }
+                ]
+              }
+            }
+            """;
+            var camelProfile = MacroEventProfileManager.LoadFromString(camelCaseJson);
+            if (camelProfile == null || camelProfile.Events.Count != 1 || camelProfile.Events[0].Name != "카멜케이스 이벤트")
+            {
+                Console.WriteLine("  ❌ [실패] 소문자/카멜케이스 래퍼 및 프로퍼티 역직렬화 실패");
+                return false;
+            }
+
+            string bareArrayJson = """
+            [
+              {
+                "Name": "단독 배열 이벤트",
+                "StateTag": "Global",
+                "Triggers": [{ "Type": "Always" }],
+                "Actions": [{ "Type": "KeyPress", "Key": "Space" }]
+              }
+            ]
+            """;
+            var arrayProfile = MacroEventProfileManager.LoadFromString(bareArrayJson);
+            if (arrayProfile == null || arrayProfile.Events.Count != 1 || arrayProfile.Events[0].Name != "단독 배열 이벤트")
+            {
+                Console.WriteLine("  ❌ [실패] 단독 이벤트 배열 JSON 자동 변환 역직렬화 실패");
+                return false;
+            }
+
+            // 7. AppSettings AI 설정 영구화 검증
             string originalProvider = AppSettings.Current.AiProvider;
             AppSettings.Current.AiProvider = "Claude";
             AppSettings.Current.AiApiKey = "test-byok-claude-key";

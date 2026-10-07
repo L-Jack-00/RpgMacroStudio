@@ -10,7 +10,9 @@ public static class MacroEventProfileManager
     {
         WriteIndented = true,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() }
     };
 
     public static void SaveToFile(string filePath, MacroEventProfile profile)
@@ -49,7 +51,6 @@ public static class MacroEventProfileManager
     public static MacroEventProfile LoadFromFile(string filePath)
     {
         string backupPath = filePath + ".bak";
-        string? json = null;
         MacroEventProfile? profile = null;
 
         // 1. 기본 프로필 파일 읽기 시도
@@ -57,10 +58,10 @@ public static class MacroEventProfileManager
         {
             try
             {
-                json = File.ReadAllText(filePath);
+                string json = File.ReadAllText(filePath);
                 if (!string.IsNullOrWhiteSpace(json))
                 {
-                    profile = JsonSerializer.Deserialize<MacroEventProfile>(json, _jsonOptions);
+                    profile = LoadFromString(json);
                 }
             }
             catch { }
@@ -74,7 +75,7 @@ public static class MacroEventProfileManager
                 string backupJson = File.ReadAllText(backupPath);
                 if (!string.IsNullOrWhiteSpace(backupJson))
                 {
-                    profile = JsonSerializer.Deserialize<MacroEventProfile>(backupJson, _jsonOptions);
+                    profile = LoadFromString(backupJson);
                 }
             }
             catch { }
@@ -88,24 +89,92 @@ public static class MacroEventProfileManager
             throw new InvalidOperationException($"프로필 파일이 손상되었으며 백업본에서 복구할 수 없습니다: {filePath}");
         }
 
-        NormalizeProfile(profile);
         return profile;
     }
 
     /// <summary>
     /// JSON 문자열로부터 프로필을 역직렬화하고 무결성을 정규화합니다. (AI 생성기 및 클립보드 호환)
+    /// 최상위 래퍼 객체({"MacroEventProfile": {...}} 등) 자동 언래핑 및 단독 이벤트 배열 포맷 자동 변환을 완벽하게 지원합니다.
     /// </summary>
     public static MacroEventProfile LoadFromString(string json)
     {
         if (string.IsNullOrWhiteSpace(json))
             throw new ArgumentException("JSON 문자열이 비어있습니다.", nameof(json));
 
-        var profile = JsonSerializer.Deserialize<MacroEventProfile>(json, _jsonOptions);
+        using var doc = JsonDocument.Parse(json);
+        JsonElement root = doc.RootElement;
+
+        // 1. 단독 이벤트 배열 ([{...}, {...}]) 형태인 경우 자동 래핑 변환
+        if (root.ValueKind == JsonValueKind.Array)
+        {
+            var eventList = JsonSerializer.Deserialize<List<MacroEvent>>(root.GetRawText(), _jsonOptions);
+            if (eventList != null && eventList.Count > 0)
+            {
+                var syntheticProfile = new MacroEventProfile
+                {
+                    ProfileName = "AI 생성 프로필",
+                    Events = eventList
+                };
+                NormalizeProfile(syntheticProfile);
+                return syntheticProfile;
+            }
+        }
+
+        // 2. 최상위 객체가 래퍼(Wrapper)로 감싸져 있는 경우 자동 탐색 및 언래핑
+        if (root.ValueKind == JsonValueKind.Object)
+        {
+            root = FindProfileElement(root);
+        }
+
+        var profile = JsonSerializer.Deserialize<MacroEventProfile>(root.GetRawText(), _jsonOptions);
         if (profile == null)
             throw new InvalidOperationException("프로필 역직렬화 결과가 null입니다.");
 
         NormalizeProfile(profile);
         return profile;
+    }
+
+    private static JsonElement FindProfileElement(JsonElement element)
+    {
+        // 1. 이미 Events/events 등의 핵심 프로퍼티를 가지고 있다면 이 요소가 프로필 본체
+        if (HasProfileProperties(element))
+        {
+            return element;
+        }
+
+        // 2. 대표적인 래퍼 키 이름 우선 탐색
+        string[] candidateKeys = { "MacroEventProfile", "macroEventProfile", "macro_event_profile", "profile", "Profile", "data", "Data" };
+        foreach (var key in candidateKeys)
+        {
+            if (element.TryGetProperty(key, out var child) && child.ValueKind == JsonValueKind.Object)
+            {
+                if (HasProfileProperties(child)) return child;
+                var deeper = FindProfileElement(child);
+                if (HasProfileProperties(deeper)) return deeper;
+            }
+        }
+
+        // 3. 임의의 키라도 자식 객체 중 Events/events를 포함하는 객체가 있다면 선택
+        foreach (var prop in element.EnumerateObject())
+        {
+            if (prop.Value.ValueKind == JsonValueKind.Object && HasProfileProperties(prop.Value))
+            {
+                return prop.Value;
+            }
+        }
+
+        return element;
+    }
+
+    private static bool HasProfileProperties(JsonElement elem)
+    {
+        if (elem.ValueKind != JsonValueKind.Object) return false;
+        return elem.TryGetProperty("Events", out _) ||
+               elem.TryGetProperty("events", out _) ||
+               elem.TryGetProperty("States", out _) ||
+               elem.TryGetProperty("states", out _) ||
+               elem.TryGetProperty("ProfileName", out _) ||
+               elem.TryGetProperty("profileName", out _);
     }
 
     /// <summary>

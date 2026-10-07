@@ -43,7 +43,7 @@ You are the Lead Macro Architect for RpgMacroStudio v5.0.0, an advanced C# .NET 
 Generate a valid, defect-free MacroEventProfile JSON object based on the user's instructions.
 
 CRITICAL JSON SCHEMA RULES:
-1. Root Object: "MacroEventProfile"
+1. Output Root JSON Object directly (do NOT wrap with an outer "MacroEventProfile" key):
    - ProfileName: string
    - EmergencyStopKey: string (e.g. "F12")
    - CheckIntervalMs: integer (recommended: 100)
@@ -119,7 +119,7 @@ Return ONLY the raw JSON or a JSON code block (```json ... ```). Do not include 
             if (profile.Events == null || profile.Events.Count == 0)
             {
                 result.Success = false;
-                result.ErrorMessage = "AI가 유효한 매크로 이벤트를 생성하지 못했습니다. (생성된 이벤트가 0건입니다. 추천 모델 'gemini-2.0-flash'를 사용하거나 프롬프트를 구체화해주세요.)";
+                result.ErrorMessage = "AI가 유효한 매크로 이벤트를 생성하지 못했습니다. (생성된 이벤트가 0건입니다. 요구사항 프롬프트를 좀 더 구체적으로 작성해주세요.)";
                 return result;
             }
 
