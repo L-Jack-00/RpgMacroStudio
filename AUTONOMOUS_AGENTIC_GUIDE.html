@@ -220,9 +220,9 @@
 
 <div class="container">
     <header>
-        <span class="badge">Next-Gen Autonomous Workflow (v4.0.0 메이저 개정판)</span>
+        <span class="badge">Next-Gen Autonomous Workflow (v5.0.0 메이저 개정판)</span>
         <h1>초자율 에이전틱 코딩 & '딸깍' 마스터 가이드</h1>
-        <p class="subtitle">단 한 번의 요청으로 AI가 스스로 코딩-빌드-자체 테스트-자가 치유-12대 감사-원클릭 패키징을 완주하고, 인간은 감독만 하는 초고효율 작업 환경 구축법</p>
+        <p class="subtitle">단 한 번의 요청으로 AI가 스스로 코딩-빌드-자체 테스트-자가 치유-12대 감사-반응형 슬림 뷰/유니코드 합성 폰트 렌더링-원클릭 패키징을 완주하고, 인간은 감독만 하는 초고효율 작업 환경 구축법</p>
     </header>
 
     <!-- 섹션 1 -->
@@ -254,9 +254,9 @@
 
     <!-- 섹션 2 -->
     <section>
-        <h2>⚙️ 2. '딸깍'을 실현하는 6단계 프롬프트 설계 공식</h2>
+        <h2>⚙️ 2. '딸깍'을 실현하는 8단계 프롬프트 설계 공식 (v5.0.0)</h2>
         <div class="card">
-            <p>단 한 번의 지시로 완성까지 달리게 만들려면 다음 6가지 요소를 프롬프트에 조립해야 합니다.</p>
+            <p>단 한 번의 지시로 완성까지 달리게 만들려면 다음 8가지 요소를 프롬프트에 조립해야 합니다.</p>
             
             <div class="formula-steps">
                 <div class="step-row" style="border-left-color: var(--primary);">
@@ -294,8 +294,22 @@
                         <span>커스텀 컨트롤 자가 완비(GetPreferredSize/배경 클리어), 도킹 격리 컨테이너, 텍스트 비클리핑, 테마 일원화와 수식 기반 비중첩 테스트.</span>
                     </div>
                 </div>
-                <div class="step-row" style="border-left-color: var(--accent-rose);">
+                <div class="step-row" style="border-left-color: #a855f7;">
                     <div class="step-num">6</div>
+                    <div class="step-info">
+                        <strong>반응형 가변 뷰 & 전역 유니코드 합성 렌더링 (Responsive & Unicode Rig, v5.0.0 신설)</strong>
+                        <span>패널 폭 축소 시 32px 슬림 버튼 축소(ToolTip 호버 연동)와 Windows GDI+ 글리프 깨짐(□)을 방지하는 복합 폰트(Segoe UI Emoji + Segoe UI) 합성 렌더링.</span>
+                    </div>
+                </div>
+                <div class="step-row" style="border-left-color: #06b6d4;">
+                    <div class="step-num">7</div>
+                    <div class="step-info">
+                        <strong>BYOK 멀티 AI 안전성 (BYOK Multi-AI Rig, v5.0.0 신설)</strong>
+                        <span>유저 API 키 기반 비용 0% 방어 및 외부 네트워크 통신 없는 오프라인 Mock 클라이언트로 CI 무결성 보장.</span>
+                    </div>
+                </div>
+                <div class="step-row" style="border-left-color: var(--accent-rose);">
+                    <div class="step-num">8</div>
                     <div class="step-info">
                         <strong>감독관 보고 & 원클릭 동적 릴리즈 (Approval Gate & Release)</strong>
                         <span>사소한 결정은 AI가 상식선에서 처리하고, 최종 통과 후 <code>build_release.py</code>로 자동 패키징 완료 후 종합 보고.</span>
@@ -307,16 +321,16 @@
 
     <!-- 섹션 3: 마스터 프롬프트 -->
     <section>
-        <h2>📋 3. 실전 "초자율 딸깍 마스터 프롬프트" (원클릭 복사)</h2>
+        <h2>📋 3. 실전 "초자율 딸깍 마스터 프롬프트" (원클릭 복사, v5.0.0)</h2>
         <div class="card">
             <p>새 프로젝트의 첫 대화창에 아래 템플릿의 <code>{...}</code> 부분만 채워서 전송하세요.</p>
 
             <div class="code-container">
                 <div class="code-header">
-                    <span>Autonomous Master Prompt</span>
+                    <span>Autonomous Master Prompt (v5.0.0)</span>
                     <button class="copy-btn" onclick="copyCode(this, 'prompt-autonomous')">📋 복사하기</button>
                 </div>
-                <pre id="prompt-autonomous">[자율 실행 모드: 소프트웨어 완전 자율 구현 및 검증 요청]
+                <pre id="prompt-autonomous">[자율 실행 모드: 소프트웨어 완전 자율 구현 및 무결성 검증 요청]
 
 당신은 자율 실행 능력을 갖춘 '수석 소프트웨어 엔지니어링 팀'입니다.
 지금부터 {만들고자 하는 프로그램 이름 및 핵심 기능}을 개발하되, 사소한 확인을 위해 멈추지 말고 아래의 [자율 실행 프로토콜]에 따라 최종 완성까지 멈춤 없이 작업을 완주하세요.
@@ -343,10 +357,16 @@
    - 커스텀 컨트롤 자가 완비(GetPreferredSize + Paint 배경 100% 클리어), 도킹 격리 컨테이너, 텍스트 비클리핑 버퍼, 테마 일원화를 준수하세요.
    - 컨트롤 비중첩(Right <= Left), 충분 폭 확보(Width >= PreferredWidth)를 헤드리스 테스트에 수식으로 강제하여 UI 깨짐을 원천 방어하세요.
 
-6. 원클릭 동적 릴리즈 빌드 하네스
+6. 반응형 가변 적응 및 유니코드 복합 폰트 렌더링 (v5.0.0)
+   - 인스펙터 패널 폭에 맞춘 32px 슬림 버튼 축소(ToolTip 호버 연동)와 유니코드 클러스터 분리 복합 폰트 합성 렌더링(DrawMixedString)을 구현하여 기호 깨짐(□)을 영구 차단하세요.
+
+7. BYOK 멀티 프로바이더 AI 안전성 (v5.0.0)
+   - AI 도입 시 사용자 API 키 기반 BYOK 아키텍처를 강제하여 운영자 비용 손실을 0%로 차단하고, 외부 통신 없는 헤드리스 Mock 클라이언트로 CI 검증을 완비하세요.
+
+8. 원클릭 동적 릴리즈 빌드 하네스
    - 소스코드 버전을 자동 감지하여 단일 실행기 배치, data/ 서브폴더 격리, ZIP 압축까지 단일 명령으로 완료하는 build_release.py를 구축하세요.
 
-7. 감독관 보고 규칙 (Human-in-the-Loop)
+9. 감독관 보고 규칙 (Human-in-the-Loop)
    - 중간에 사소한 질문(예: 변수명, 버튼 색상 등)으로 실행을 멈추지 말고 상식적인 최선의 결정을 직접 내리세요.
    - 오직 [전체 아키텍처가 완전히 완성되어 모든 테스트와 12대 감사가 통과했을 때]만 최종 결과를 종합 요약하여 보고하세요.
 
@@ -357,7 +377,7 @@
 
     <!-- 섹션 4: 실전 꿀팁 -->
     <section>
-        <h2>🎯 4. 자율 작업 감독관으로서의 실전 꿀팁 5선</h2>
+        <h2>🎯 4. 자율 작업 감독관으로서의 실전 꿀팁 6선 (v5.0.0)</h2>
         
         <div class="card">
             <div class="tip-card">
@@ -395,6 +415,11 @@
             <div class="tip-card" style="border-left-color: var(--accent-rose);">
                 <strong style="color: var(--accent-rose);">팁 5. UI 글씨 짤림/겹침에 절대 픽셀 땜질을 허용하지 마라 (수식 검증 강제)</strong>
                 <p>UI 오류가 발생했을 때 컨트롤 폭을 10픽셀 키우는 땜질은 환경이 바뀌면 무조건 재발합니다. AI에게 <strong>"근본 원인 3종(Z-Order 역전, Paint 잔상 누적, AutoSize 불일치)을 진단하고, 4대 원칙(자가 완비, 도킹 격리, 비클리핑, 테마 일원화)을 적용한 뒤, 수식 기반 비중첩 레이아웃 테스트를 추가하라"</strong>고 지시하세요.</p>
+            </div>
+
+            <div class="tip-card" style="border-left-color: #38bdf8;">
+                <strong style="color: #38bdf8;">팁 6. 패널 가변 적응 32px 슬림 버튼과 유니코드 무손상 합성 렌더링 강제 (v5.0.0)</strong>
+                <p>패널이나 창이 좁아질 때 버튼 텍스트가 잘리는 문제는 텍스트만 "➕"로 바꾸는 게 아니라 <strong>버튼 폭을 32px 정사각형 슬림형으로 동적 축소하고 ToolTip을 연결</strong>해야 UX가 유지됩니다. 또한 특수문자/이모지가 네모(□)로 깨지는 Windows GDI+ 문제는 <code>Segoe UI Emoji(Regular)</code>와 <code>Segoe UI(Bold)</code>의 <strong>유니코드 클러스터 분리 합성 렌더링(DrawMixedString)</strong>을 강제해야 영구 해결됩니다.</p>
             </div>
         </div>
     </section>

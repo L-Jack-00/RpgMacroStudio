@@ -279,9 +279,9 @@
 
 <div class="container">
     <header>
-        <span class="badge">Harness Engineering Master Guide (v4.0.0 메이저 개정판)</span>
+        <span class="badge">Harness Engineering Master Guide (v5.0.0 메이저 개정판)</span>
         <h1>하네스 엔지니어링 실전 아키텍처 및 복습 가이드</h1>
-        <p class="subtitle">소프트웨어 런타임 하네스의 8단계 정착 변천사, 적절성 분석, 그리고 신규 세션 즉시 적용 프롬프트 자산</p>
+        <p class="subtitle">소프트웨어 런타임 하네스의 10단계 정착 변천사, 적절성 분석, 그리고 신규 세션 즉시 적용 프롬프트 자산</p>
     </header>
 
     <!-- Part 1 -->
@@ -356,6 +356,22 @@
                         <p>Dock Z-Order 역전, Paint 잔상 누적, AutoSize 불일치 3대 원인을 규명하고, 커스텀 컨트롤 자가 완비, 도킹 컨테이너 격리, 비클리핑 버퍼, 테마 일원화 4대 원칙과 수식 기반 비중첩 레이아웃 회귀 검증(<code>TestInspectorLayout</code>) 체계 확립.</p>
                     </div>
                 </div>
+
+                <div class="step-item">
+                    <div class="step-badge">9</div>
+                    <div class="step-content">
+                        <h4>9단계: BYOK 멀티 프로바이더 AI 어시스턴트 & 모의 검증 파이프라인 (BYOK Multi-AI Rig)</h4>
+                        <p>유저 API 키를 사용하는 <strong>BYOK(Bring Your Own Key)</strong> 아키텍처로 운영자 비용 손실 0% 보호. 5대 모델(Gemini, Claude, OpenAI, Ollama, Mock) 런타임 자유 전환 및 외부 통신 없는 헤드리스 Mock 클라이언트로 CI 검증 완비.</p>
+                    </div>
+                </div>
+
+                <div class="step-item">
+                    <div class="step-badge">10</div>
+                    <div class="step-content">
+                        <h4>10단계: 완전 적응형 가변 뷰 & 전역 유니코드 합성 렌더링 하네스 (Responsive & Unicode Rig)</h4>
+                        <p>가로 스크롤 0% 비례 컬럼 자동 조정, 인스펙터 패널 폭에 연동되는 <strong>32px 슬림 버튼 축소(ToolTip 호버 연동)</strong>, 그리고 Windows GDI+ 글리프 깨짐(□ tófu)을 100% 영구 해결한 <strong>유니코드 클러스터 분리 복합 폰트(Segoe UI Emoji + Segoe UI Bold) 합성 렌더링</strong> 체계 정립.</p>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -382,6 +398,14 @@
                     <strong style="color: var(--accent-rose);">📐 5. UI 무결성 4대 원칙 및 수식 기반 레이아웃 방어 (Zero-Defect UI)</strong>
                     눈대중이나 임시 픽셀 땜질 대신 컨트롤 자가 완비(GetPreferredSize + Paint 배경 클리어), 도킹 컨테이너 격리, 텍스트 비클리핑 버퍼를 적용하고, 컨트롤 비중첩(Right &lt;= Left)과 충분 폭을 수학적 부등식으로 자동 검증합니다.
                 </div>
+                <div class="rule-item" style="border-left-color: #06b6d4;">
+                    <strong style="color: #06b6d4;">🤖 6. BYOK 멀티 프로바이더 AI 아키텍처 (BYOK Multi-AI Rig)</strong>
+                    사용자 API 키 기반 BYOK 아키텍처로 운영자 비용 손실을 0%로 차단하고, 5대 프로바이더(Gemini, Claude, OpenAI, Ollama, Mock) 공통 인터페이스 추상화 및 외부 통신 없는 헤드리스 Mock 클라이언트로 CI 검증을 완비합니다.
+                </div>
+                <div class="rule-item" style="border-left-color: #a855f7;">
+                    <strong style="color: #a855f7;">🎨 7. 완전 적응형 가변 뷰 & 유니코드 복합 폰트 합성 렌더링 (Responsive & Unicode Rig)</strong>
+                    인스펙터 폭에 연동되는 32px 슬림 버튼 축소(ToolTip 호버 연동)와 Windows GDI+ 글리프 깨짐(□)을 영구 해결한 Segoe UI Emoji(Regular) + Segoe UI(Bold) 유니코드 클러스터 분리 합성 렌더링(<code>DrawMixedString</code>)으로 모든 해상도에서 무결한 UI를 보장합니다.
+                </div>
             </div>
         </div>
     </section>
@@ -401,36 +425,41 @@
                     <span>Master Prompt Template</span>
                     <button class="copy-btn" onclick="copyCode(this, 'prompt-master')">📋 복사하기</button>
                 </div>
-                <pre id="prompt-master">[시스템 아키텍처 및 런타임 하네스(Runtime Harness) 개발 지침]
+                <pre id="prompt-master">[시스템 아키텍처 및 런타임 하네스(Runtime Harness) 개발 지침 (v5.0.0)]
 
 우리는 지금부터 {프로젝트 이름 / 구현할 시스템}을 함께 개발할 것입니다.
 단순히 동작만 하는 일자형 코드가 아니라, 신뢰성과 확장성이 높은 "런타임 하네스(Runtime Harness) 엔지니어링" 방식으로 설계하고 개발해주세요.
 
-다음의 6대 개발 원칙을 반드시 준수해야 합니다:
+다음의 7대 개발 원칙을 반드시 준수해야 합니다:
 
-1. 하네스 코어와 입출력 분리 (Loose Coupling)
+1. 하네스 코어와 입출력 분리 (Loose Coupling & Supervisor)
    - 핵심 비즈니스 로직(판단/연산/상태)은 외부 입출력(UI, 센서, DB, 하드웨어)과 강하게 결합되지 않고 인터페이스/이벤트로 분리되어야 합니다.
-   - 장기 실행 작업이 메인 관리 루프를 블로킹하지 않도록 비동기 브랜치(Worker) 모델을 적용하세요.
+   - 장기 실행 작업이 메인 슈퍼바이저 루프를 블로킹하지 않도록 비동기 브랜치(Worker Task) 모델을 적용하세요.
 
-2. 상태(FSM) 및 컨텍스트 관리
+2. 상태(FSM) 및 블랙보드 메모리 컨텍스트
    - 시스템의 현재 상태(CurrentState)와 공유 런타임 메모리(Blackboard)를 코어가 안전하게 소유하고, 예측 가능한 상태 전이를 지원해야 합니다.
-   - 시작(Start), 종료(Stop) 외에 메모리를 보존한 채 CPU 점유율을 0%로 동결하는 일시정지(Pause/Resume)와 긴급 중단(Emergency Stop) 인터록을 지원해야 합니다.
+   - 다중 조건(센서 + 변수 + 타이머)을 AND 결합으로 평가하고, 안전한 상태 전이를 수행하세요.
 
-3. Headless 자체 검증 테스트 하네스 동시 개발 (Self-Test First)
-   - 실제 GUI나 외부 장치 없이도 콘솔 명령어(예: --test)만으로 상태 전이, 이벤트 처리, 예외 상황을 100% 검증할 수 있는 SelfTestRunner를 코어 개발과 동시에 구현하세요.
-   - 새 기능이 추가될 때마다 해당 기능을 검증하는 테스트 케이스를 누적 추가해야 합니다.
+3. 생명주기 및 인터럽트 제어 (Lifecycle & Safety Interlock)
+   - 시작/정지 외에 상태와 변수를 메모리에 보존하며 CPU 점유율을 0%로 동결하는 일시정지/재개(ManualResetEvent 기반)를 구현하세요.
+   - 최우선 비상정지(Emergency Stop) 인터록을 연결하여 언제든 즉시 안전 차단이 가능하도록 해주세요.
 
-4. 12대 전담 에이전트 종합 감사 및 졸업형 와치독
-   - 버전 일치, 다국어 번역, UI 레이아웃, 단축키 일관성, 코드 청결성을 자동 검증하는 inspect_agents.py 감사 스크립트를 상시 유지하세요.
-   - 3회 연속 통과한 감시 항목은 자동으로 졸업(Graduation)시켜 AI 토큰 소모를 방어하세요.
+4. 전 뷰 조작 일관성 및 시각 피드백 (Universal View Invariance)
+   - 다중 뷰 모드가 존재할 때 단축키(F2 편집, Delete 삭제, Enter 열기, Space 토글)가 모든 뷰에서 동일하게 작동해야 합니다.
+   - 뷰 모드 전환 시 줌/팬 좌표계와 선택 상태가 초기화되지 않고 100% 보존되도록 독립 좌표계를 유지하세요.
 
-5. 전 뷰 조작 일관성 및 자동 패키징 하네스
-   - 다중 뷰 환경에서 단축키(F2, Delete, Enter, Space) 누락이 없도록 공통 조작 디스패처를 하네스에 탑재하고, 뷰 전환 시 줌/팬 좌표를 독립 보존하세요.
-   - 소스코드 버전을 자동 추출하여 단일 런처 조립, 서브폴더 격리, ZIP 압축까지 원클릭으로 완료하는 build_release.py 패키징 하네스를 구축하세요.
+5. BYOK 멀티 프로바이더 AI 엔진 결합 (v5.0.0 신설)
+   - AI 기능 도입 시 유저 본인의 API 키를 입력하는 BYOK 구조를 적용하여 운영자 비용 손실을 0%로 차단하세요.
+   - 멀티 프로바이더(Gemini, Claude, OpenAI, Ollama, Mock)를 단일 인터페이스로 추상화하고, 외부 통신 없는 헤드리스 Mock 클라이언트로 CI 검증을 완비하세요.
 
-6. UI 결함 재발 방지 4대 원칙 및 수식 기반 레이아웃 회귀 하네스
-   - 커스텀 컨트롤 자가 완비(GetPreferredSize + Paint 배경 클리어), 도킹 격리 컨테이너, 텍스트 비클리핑 버퍼, 테마 일원화를 준수하세요.
-   - 컨트롤 비중첩(Right <= Left), 충분 폭 확보(Width >= PreferredWidth)를 헤드리스 테스트에 수식으로 강제하여 UI 깨짐을 원천 방어하세요.</pre>
+6. 반응형 UI 가변 적응 및 유니코드 복합 폰트 렌더링 (v5.0.0 신설)
+   - 가용 패널 너비에 따라 버튼이 자동으로 32px 슬림 정사각형 아이콘(ToolTip 호버 연동)으로 축소되는 반응형 레이아웃을 구축하세요.
+   - Windows GDI+에서 기호/이모지가 네모(□)로 깨지지 않도록, 유니코드 클러스터를 분리하여 Segoe UI Emoji(Regular)와 Segoe UI(Bold)로 합성 렌더링(DrawMixedString)하세요.
+
+7. 관측성, 12대 에이전트 감사 및 자동 빌드 파이프라인
+   - GUI 없이도 콘솔 명령어(--test)로 로직 및 수식 레이아웃을 1초 만에 검증하는 SelfTestRunner를 코어와 동시 구축하세요.
+   - 버전, 다국어, 레이아웃, 단축키 일관성을 전수 점검하는 inspect_agents.py와 5초 핫루프 quick_check.py를 상시 유지하세요.
+   - 동적 버전 감지 및 단일 런처 패키징을 수행하는 build_release.py를 구축하세요.</pre>
             </div>
         </div>
 
@@ -492,28 +521,31 @@
         <div class="card">
             <div class="checklist">
                 <label class="check-item">
-                    <input type="checkbox"> <span>메인 루프가 긴 작업이나 I/O 대기로 인해 멈추지 않는가? (비동기 분기)</span>
+                    <input type="checkbox"> <span>메인 루프가 하나의 I/O나 대기 작업 때문에 멈추지 않는가? (비동기 분기)</span>
                 </label>
                 <label class="check-item">
-                    <input type="checkbox"> <span>일시정지 시 메모리(상태/변수)를 보존한 채 CPU 점유율 0%로 동결되는가?</span>
+                    <input type="checkbox"> <span>중간에 멈췄을 때 상태와 변수를 잃지 않고 재개할 수 있는가? (ManualResetEvent CPU 0% 동결)</span>
                 </label>
                 <label class="check-item">
-                    <input type="checkbox"> <span>위급 상황 시 즉시 모든 작업을 강제 차단하는 비상정지(EmergencyStop)가 있는가?</span>
+                    <input type="checkbox"> <span>위급 상황 시 즉시 모든 작업을 강제 차단할 수 있는 안전망이 있는가? (최우선 EmergencyStop)</span>
                 </label>
                 <label class="check-item">
-                    <input type="checkbox"> <span>다중 뷰 간에 단축키(F2/Delete/Enter/Space)와 줌/팬 좌표가 일관되게 보존되는가?</span>
+                    <input type="checkbox"> <span>다중 뷰 간에 단축키와 상태 보존이 일관되게 유지되는가? (전 뷰 조작 불변성 & 독립 줌/팬 보존)</span>
                 </label>
                 <label class="check-item">
-                    <input type="checkbox"> <span>UI 요소가 겹치거나 잘리지 않고 수식 기반 레이아웃 테스트를 통과하는가?</span>
+                    <input type="checkbox"> <span>AI 호출 시 운영자 비용이 보호되고 오프라인 테스트가 가능한가? (BYOK 구조 & MockAiProviderClient 탑재)</span>
                 </label>
                 <label class="check-item">
-                    <input type="checkbox"> <span>실제 UI 화면이나 외부 장치 없이도 엔진만 검증하는 <code>--test</code> 러너가 있는가?</span>
+                    <input type="checkbox"> <span>창이나 패널이 좁아져도 UI가 깨지지 않고 적응하는가? (32px 슬림 버튼 축소 & ToolTip 호버)</span>
                 </label>
                 <label class="check-item">
-                    <input type="checkbox"> <span>12대 전담 에이전트 종합 감사가 결함 0건(ALL PASS)을 유지하고 있는가?</span>
+                    <input type="checkbox"> <span>유니코드 특수기호나 이모지가 네모(□)로 깨지거나 왜곡되지 않는가? (AppFontHelper 복합 폰트 합성 렌더링)</span>
                 </label>
                 <label class="check-item">
-                    <input type="checkbox"> <span>버전 자동 감지 및 단일 런처 조립, ZIP 패키징이 원클릭 스크립트로 동작하는가?</span>
+                    <input type="checkbox"> <span>실제 GUI 화면이나 외부 장치 없이도 엔진만 검증하는 <code>--test</code> 러너가 있는가? (Headless 1초 자체 검증)</span>
+                </label>
+                <label class="check-item">
+                    <input type="checkbox"> <span>12대 전담 에이전트 종합 감사가 결함 0건(ALL PASS)을 유지하고 자동 릴리즈가 동작하는가? (<code>inspect_agents.py</code> & <code>build_release.py</code>)</span>
                 </label>
             </div>
         </div>
