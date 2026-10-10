@@ -93,7 +93,8 @@ public partial class NodeCanvasControl
     {
         MacroLayoutEngine.ComputeSmartLayout(
             _profile,
-            st => GetNodeBounds(st, new NodeCanvasPosition(0, 0)).Height
+            st => GetNodeBounds(st, new NodeCanvasPosition(0, 0)).Height,
+            st => GetNodeBounds(st, new NodeCanvasPosition(0, 0)).Width
         );
     }
 

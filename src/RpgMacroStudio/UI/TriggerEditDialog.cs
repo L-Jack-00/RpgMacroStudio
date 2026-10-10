@@ -94,7 +94,7 @@ public class TriggerEditDialog : Form
             ko ? "🔢 변수/스위치 값 비교" : "🔢 Variable/Switch Compare",
             ko ? "🔄 무조건 상시 실행" : "🔄 Always Active"
         });
-        _cboType.SelectedIndex = 0;
+        _cboType.SelectedIndex = 3;
         _cboType.SelectedIndexChanged += (s, e) => UpdatePanels();
 
         // 1. 통합 비전 감지 패널

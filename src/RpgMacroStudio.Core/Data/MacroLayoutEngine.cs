@@ -14,11 +14,13 @@ public static class MacroLayoutEngine
     public static void ComputeSmartLayout(
         MacroEventProfile profile,
         Func<string, float>? getNodeHeightFunc = null,
+        Func<string, float>? getNodeWidthFunc = null,
         float startX = 80f,
         float startY = 80f,
         float colSpacingX = 420f,
         float verticalGap = 60f,
-        float defaultNodeHeight = 220f)
+        float defaultNodeHeight = 220f,
+        float defaultNodeWidth = 340f)
     {
         getNodeHeightFunc ??= (_ => defaultNodeHeight);
 
@@ -102,15 +104,15 @@ public static class MacroLayoutEngine
             }
         }
 
-        // C. 열별로 상태들을 그룹화하고 각 노드의 동적 높이를 계산하여 Y 좌표 배치
+        // C. 열별로 상태들을 그룹화하고 각 노드의 동적 너비 및 높이를 계산하여 배치 (노드 크기 반영)
         var columns = columnMap
             .GroupBy(kvp => kvp.Value)
-            .OrderBy(g => g.Key);
+            .OrderBy(g => g.Key)
+            .ToList();
 
+        float currentX = startX;
         foreach (var group in columns)
         {
-            int colIndex = group.Key;
-            float currentX = startX + colIndex * colSpacingX;
             float currentY = startY;
 
             // 시작 상태가 해당 열에 있다면 최상단에 우선 배치
@@ -121,12 +123,32 @@ public static class MacroLayoutEngine
                 statesInCol.Insert(0, initialState);
             }
 
+            // 해당 열에 속한 노드들의 최대 너비 계산 (노드 크기 고려)
+            float colMaxWidth = defaultNodeWidth;
+            foreach (var st in statesInCol)
+            {
+                float w = defaultNodeWidth;
+                if (getNodeWidthFunc != null)
+                {
+                    w = getNodeWidthFunc(st);
+                }
+                else if (profile.NodeSizes.TryGetValue(st, out var s) && s.Width > 0)
+                {
+                    w = s.Width;
+                }
+                if (w > colMaxWidth) colMaxWidth = w;
+            }
+
             foreach (var st in statesInCol)
             {
                 float nodeHeight = getNodeHeightFunc(st);
                 profile.NodePositions[st] = new NodeCanvasPosition(currentX, currentY);
                 currentY += nodeHeight + verticalGap;
             }
+
+            // 다음 열은 현재 열의 최대 너비 + 여백(80px)을 고려하여 안전하게 배치 (기존 최소 colSpacingX 보장)
+            float effectiveColSpacing = Math.Max(colSpacingX, colMaxWidth + 80f);
+            currentX += effectiveColSpacing;
         }
     }
 
@@ -148,15 +170,17 @@ public static class MacroLayoutEngine
             return new NodeCanvasPosition(preferredX, preferredY);
         }
 
-        // 기존 노드들의 AABB(Axis-Aligned Bounding Box) 목록 구축
+        // 기존 노드들의 실제 크기(NodeSizes)를 반영한 AABB(Axis-Aligned Bounding Box) 목록 구축
         var existingBoxes = new List<(float X1, float Y1, float X2, float Y2)>();
         foreach (var kvp in profile.NodePositions)
         {
+            float existingW = (profile.NodeSizes.TryGetValue(kvp.Key, out var es) && es.Width > 0) ? es.Width : nodeWidth;
+            float existingH = (profile.NodeSizes.TryGetValue(kvp.Key, out var eh) && eh.Height > 0) ? eh.Height : nodeHeight;
             existingBoxes.Add((
                 kvp.Value.X - margin,
                 kvp.Value.Y - margin,
-                kvp.Value.X + nodeWidth + margin,
-                kvp.Value.Y + nodeHeight + margin
+                kvp.Value.X + existingW + margin,
+                kvp.Value.Y + existingH + margin
             ));
         }
 

@@ -17,6 +17,11 @@ public partial class NodeCanvasControl
     private SizeF _resizeStartGraphSize;
     private PointF _resizeStartGraphMousePt;
 
+    /// <summary>
+    /// 첫 실행 시에만 시작 노드의 Flow-Out 핀을 하이라이트로 표시할지 여부
+    /// </summary>
+    public bool HighlightStartPinOnFirstRun { get; set; } = false;
+
     public PointF GetPinWorldPosition(GraphNode node, GraphPin pin)
     {
         float baseW = (node.NodeType == GraphNodeType.Start) ? 200f : (node.NodeType == GraphNodeType.Condition ? 250f : 220f);
@@ -277,6 +282,10 @@ public partial class NodeCanvasControl
                         hColor1 = Color.FromArgb(0, 206, 201);
                         hColor2 = Color.FromArgb(9, 132, 227);
                         break;
+                    case GraphNodeType.KeySequence:
+                        hColor1 = Color.FromArgb(70, 80, 160);
+                        hColor2 = Color.FromArgb(45, 52, 110);
+                        break;
                     default:
                         hColor1 = Color.FromArgb(9, 132, 227);
                         hColor2 = Color.FromArgb(41, 128, 185);
@@ -289,8 +298,23 @@ public partial class NodeCanvasControl
                 FillRoundedHeader(g, headerBrush, headerRect, 8);
             }
 
+            // KeySequence 노드 헤더 접기/펼치기 버튼 렌더링
+            if (node.NodeType == GraphNodeType.KeySequence)
+            {
+                float btnW = 58f * fontScale;
+                float btnH = 18f * fontScale;
+                var foldBtnRect = new RectangleF(headerRect.Right - btnW - 8f * fontScale, headerRect.Y + (headerRect.Height - btnH) / 2f, btnW, btnH);
+                using var btnBg = new SolidBrush(Color.FromArgb(130, 0, 0, 0));
+                FillRoundedRectangle(g, btnBg, foldBtnRect, 3);
+                using var btnBorder = new Pen(Color.FromArgb(180, 255, 255, 255), 1f);
+                DrawRoundedRectangle(g, btnBorder, foldBtnRect, 3);
+                string btnTxt = node.IsCollapsed ? "▶ 펼치기" : "▼ 접기";
+                AppFontHelper.DrawMixedString(g, btnTxt, 7.5f * fontScale, Brushes.White, foldBtnRect, StringAlignment.Center, StringAlignment.Center, FontStyle.Bold);
+            }
+
             // 헤더 텍스트 (이모지는 Segoe UI Emoji Regular, 텍스트는 Segoe UI Bold로 선명하게 합성 렌더링)
-            var textRect = new RectangleF(headerRect.X + 12 * fontScale, headerRect.Y, headerRect.Width - 24 * fontScale, headerRect.Height);
+            float textPadRight = (node.NodeType == GraphNodeType.KeySequence) ? 72f * fontScale : 24f * fontScale;
+            var textRect = new RectangleF(headerRect.X + 12 * fontScale, headerRect.Y, headerRect.Width - textPadRight, headerRect.Height);
             Brush hTextBrush = !isEnabled ? (IsDarkMode ? Brushes.LightGray : Brushes.DimGray) : Brushes.White;
             AppFontHelper.DrawMixedString(g, node.Title, 10f * fontScale, hTextBrush, textRect, StringAlignment.Near, StringAlignment.Center, FontStyle.Bold);
 
@@ -385,6 +409,31 @@ public partial class NodeCanvasControl
                     g.DrawString(act.MouseButton.ToString(), fBadge, Brushes.White, mouseBadgeRect, sfM);
                 }
             }
+            else if (node.NodeType == GraphNodeType.KeySequence)
+            {
+                if (!node.IsCollapsed && node.SequenceActions != null)
+                {
+                    float rowY = graphicTop;
+                    for (int sIdx = 0; sIdx < node.SequenceActions.Count; sIdx++)
+                    {
+                        var sAct = node.SequenceActions[sIdx];
+                        var rowRect = new RectangleF(node.X + bodyPadLeft + 4f * fontScale, rowY, node.Width - bodyPadLeft - 18f * fontScale, 18f * fontScale);
+                        
+                        using var rowBg = new SolidBrush(IsDarkMode ? Color.FromArgb(32, 40, 56) : Color.FromArgb(235, 240, 248));
+                        FillRoundedRectangle(g, rowBg, rowRect, 3);
+
+                        string rowIcon = sAct.Type == ActionType.Wait 
+                            ? "⏳" 
+                            : (sAct.KeyMode == KeyStrokeMode.KeyDown ? "⬇️" : (sAct.KeyMode == KeyStrokeMode.KeyUp ? "⬆️" : "⌨️"));
+                        string rowText = sAct.Type == ActionType.Wait 
+                            ? $"대기 {sAct.WaitDurationMs}ms" 
+                            : $"{sAct.Key} ({(sAct.KeyMode == KeyStrokeMode.KeyDownUp ? "누르고 뗌" : (sAct.KeyMode == KeyStrokeMode.KeyDown ? "누름" : "손 뗌"))})";
+
+                        AppFontHelper.DrawMixedString(g, $"{rowIcon} {rowText}", 8f * fontScale, IsDarkMode ? Brushes.WhiteSmoke : Brushes.DarkSlateGray, rowRect, StringAlignment.Near, StringAlignment.Center, FontStyle.Regular);
+                        rowY += 21f * fontScale;
+                    }
+                }
+            }
 
             if (customScale)
             {
@@ -452,6 +501,8 @@ public partial class NodeCanvasControl
             pinColor = Color.White;
         }
 
+        bool isStartPinHighlight = HighlightStartPinOnFirstRun && node.NodeType == GraphNodeType.Start && pin.Direction == GraphPinDirection.Output;
+
         // 와이어 드래그 중인 핀과의 호환성 검사 및 테두리 펄스/네온 하이라이트
         bool isCompatible = false;
         if (IsPinDragging && DraggingSourceNode != null && DraggingSourcePin != null)
@@ -461,15 +512,17 @@ public partial class NodeCanvasControl
 
         bool isHovered = (HoveredPin == pin && isCompatible);
 
-        if (isCompatible)
+        if (isCompatible || isStartPinHighlight)
         {
             float pulseVal = (float)(Math.Sin(_pulsePhase) * 0.5f + 0.5f);
-            Color neonColor = pin.IsBranchPin
-                ? (pin.BranchCondition ? Color.FromArgb(46, 235, 120) : Color.FromArgb(255, 80, 80))
-                : (pin.Kind == GraphPinKind.Data ? Color.FromArgb(60, 180, 255) : Color.FromArgb(255, 215, 60));
+            Color neonColor = isStartPinHighlight
+                ? Color.FromArgb(241, 196, 15) // 첫 실행 시 시작 노드 골드 네온 펄스 아우라
+                : (pin.IsBranchPin
+                    ? (pin.BranchCondition ? Color.FromArgb(46, 235, 120) : Color.FromArgb(255, 80, 80))
+                    : (pin.Kind == GraphPinKind.Data ? Color.FromArgb(60, 180, 255) : Color.FromArgb(255, 215, 60)));
 
-            float auraRadius = r + (isHovered ? 7.5f : 4.5f) + pulseVal * (isHovered ? 4.0f : 2.5f);
-            int auraAlpha = isHovered ? 130 : (45 + (int)(pulseVal * 45));
+            float auraRadius = r + (isStartPinHighlight ? 7.5f : (isHovered ? 7.5f : 4.5f)) + pulseVal * (isHovered ? 4.0f : 2.5f);
+            int auraAlpha = isStartPinHighlight ? (140 + (int)(pulseVal * 80)) : (isHovered ? 130 : (45 + (int)(pulseVal * 45)));
 
             // 1. 은은한 네온 컬러 외부 발광 아우라 (Glow Aura)
             using (var auraBrush = new SolidBrush(Color.FromArgb(auraAlpha, neonColor)))
@@ -478,9 +531,9 @@ public partial class NodeCanvasControl
             }
 
             // 2. 테두리 펄스 네온 링 (Pulse Ring)
-            float ringRadius = r + (isHovered ? 4.5f : 2.5f) + pulseVal * 1.0f;
-            int ringAlpha = isHovered ? 255 : (150 + (int)(pulseVal * 85));
-            using (var ringPen = new Pen(Color.FromArgb(ringAlpha, neonColor), isHovered ? 2.5f : 1.6f))
+            float ringRadius = r + (isStartPinHighlight ? 4.5f : (isHovered ? 4.5f : 2.5f)) + pulseVal * 1.0f;
+            int ringAlpha = isStartPinHighlight ? 255 : (isHovered ? 255 : (150 + (int)(pulseVal * 85)));
+            using (var ringPen = new Pen(Color.FromArgb(ringAlpha, neonColor), (isHovered || isStartPinHighlight) ? 2.5f : 1.6f))
             {
                 g.DrawEllipse(ringPen, pinPos.X - ringRadius, pinPos.Y - ringRadius, ringRadius * 2, ringRadius * 2);
             }
@@ -563,6 +616,28 @@ public partial class NodeCanvasControl
             var hitNode = HitTestNode(worldPt);
             if (hitNode != null)
             {
+                // KeySequence 노드 접기/펼치기 버튼 클릭 검사
+                if (hitNode.NodeType == GraphNodeType.KeySequence)
+                {
+                    float baseW = 240f;
+                    float nodeScale = Math.Clamp(hitNode.Width / baseW, 0.7f, 3.0f);
+                    float fontScale = Math.Clamp((float)Math.Pow(nodeScale, 0.65), 0.85f, 2.2f);
+                    float headerH = Math.Max(28f, 28f * fontScale);
+                    float btnW = 58f * fontScale;
+                    float btnH = 18f * fontScale;
+                    var foldBtnRect = new RectangleF(hitNode.X + hitNode.Width - btnW - 8f * fontScale, hitNode.Y + (headerH - btnH) / 2f, btnW, btnH);
+                    if (foldBtnRect.Contains(worldPt))
+                    {
+                        hitNode.IsCollapsed = !hitNode.IsCollapsed;
+                        _profile.PinGraphCollapsedNodes[hitNode.Id] = hitNode.IsCollapsed;
+                        hitNode.Height = hitNode.IsCollapsed 
+                            ? 75f 
+                            : Math.Max(90f, 36f + (hitNode.SequenceActions?.Count ?? 0) * 22f);
+                        Invalidate();
+                        return true;
+                    }
+                }
+
                 SelectedGraphNode = hitNode;
                 SelectedGraphNodeId = hitNode.Id;
                 if (!SelectedGraphNodeIds.Contains(hitNode.Id))
@@ -834,9 +909,8 @@ public partial class NodeCanvasControl
 
         var newTrig = new MacroTrigger
         {
-            Type = TriggerType.TimerInterval,
-            IntervalMs = 1000,
-            CustomColorHex = "#3498DB"
+            Type = TriggerType.Always,
+            CustomColorHex = "#2ECC71"
         };
 
         // 기존 조건 노드에서 드래그하여 연결하는 경우에만 동일 이벤트의 추가 AND 조건으로 결합

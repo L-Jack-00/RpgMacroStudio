@@ -52,11 +52,12 @@ public static class SelfTestRunner
         allPassed &= TestAiAssistantHarnessAndMultiProviderGeneration();
         allPassed &= TestNodeClipboardAndUndoRedoIntegrity();
         allPassed &= TestKeyStrokeModesAndSimultaneousInput();
+        allPassed &= TestKeySequenceFoldingAndSizeAwareAutoLayout();
 
         if (allPassed)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("\n🎉 [모든 테스트 통과] 30개 핵심 모듈 검증 성공! v5.1.0 키 동시 입력(키다운/키업) 및 FSM 엔진 무결성 검증 완료.");
+            Console.WriteLine("\n🎉 [모든 테스트 통과] 31개 핵심 모듈 검증 성공! v5.2.0 핀 노드 접기, 상시 기본조건, 노드 크기 자동정렬 및 무결성 검증 완료.");
             Console.ResetColor();
         }
         else
@@ -2358,6 +2359,113 @@ public static class SelfTestRunner
         catch (Exception ex)
         {
             Console.WriteLine($"  ❌ [예외] 키 입력 모드 테스트 실패: {ex.Message}");
+            return false;
+        }
+    }
+
+    private static bool TestKeySequenceFoldingAndSizeAwareAutoLayout()
+    {
+        Console.WriteLine("\n[검증 31] v5.2.0 핀 노드 연속 키 접기/펼치기, 조건 기본값 상시화 및 노드 크기 반응형 자동 정렬 검증");
+        try
+        {
+            // 1. 조건 생성 시 기본 조건은 상시(Always) 검증
+            var defTrigger = new MacroTrigger();
+            if (defTrigger.Type != TriggerType.Always)
+            {
+                Console.WriteLine($"  ❌ [실패] 기본 발동 조건이 Always여야 하나 {defTrigger.Type}임");
+                return false;
+            }
+
+            // 2. 핀 노드 연속 키 입력(KeyPress / Wait) 복합 노드 묶음 및 접기/펼치기 검증
+            var profile = new MacroEventProfile
+            {
+                States = new List<string> { "Global", "사냥 상태" },
+                InitialState = "사냥 상태"
+            };
+
+            var seqEvt = new MacroEvent
+            {
+                Id = "evt_combo_1",
+                StateTag = "사냥 상태",
+                Name = "스킬 연계 콤보",
+                Actions = new List<MacroAction>
+                {
+                    new MacroAction { Type = ActionType.KeyPress, Key = "ShiftKey", KeyMode = KeyStrokeMode.KeyDown },
+                    new MacroAction { Type = ActionType.KeyPress, Key = "D1", KeyMode = KeyStrokeMode.KeyDownUp, HoldTimeMs = 40 },
+                    new MacroAction { Type = ActionType.KeyPress, Key = "ShiftKey", KeyMode = KeyStrokeMode.KeyUp },
+                    new MacroAction { Type = ActionType.Wait, WaitDurationMs = 100 },
+                    new MacroAction { Type = ActionType.KeyPress, Key = "Space", KeyMode = KeyStrokeMode.KeyDownUp }
+                }
+            };
+            profile.Events.Add(seqEvt);
+
+            var graph = PinGraphConverter.FromProfile(profile);
+            var seqNode = graph.Nodes.FirstOrDefault(n => n.NodeType == GraphNodeType.KeySequence);
+            if (seqNode == null)
+            {
+                Console.WriteLine("  ❌ [실패] 5개 연속 키/대기 액션이 KeySequence 노드로 묶이지 않음");
+                return false;
+            }
+
+            if (!seqNode.IsCollapsed || seqNode.SequenceActions?.Count != 5)
+            {
+                Console.WriteLine("  ❌ [실패] KeySequence 노드 초기 상태가 접힘(Collapsed)이 아니거나 시퀀스 액션 수 불일치");
+                return false;
+            }
+
+            if (seqNode.Height != 75f)
+            {
+                Console.WriteLine($"  ❌ [실패] 접힌 KeySequence 노드 높이 오류: {seqNode.Height} (기대: 75)");
+                return false;
+            }
+
+            // 펼치기 시뮬레이션
+            profile.PinGraphCollapsedNodes[seqNode.Id] = false;
+            var expandedGraph = PinGraphConverter.FromProfile(profile);
+            var expNode = expandedGraph.Nodes.FirstOrDefault(n => n.Id == seqNode.Id);
+            if (expNode == null || expNode.IsCollapsed || expNode.Height < 140f)
+            {
+                Console.WriteLine($"  ❌ [실패] 펼친 KeySequence 노드 높이 동적 확장 실패: {expNode?.Height}");
+                return false;
+            }
+
+            // 3. 노드 크기(Width/Height) 동적 반응형 스마트 자동 정렬 검증 (겹침 0% 보장)
+            var layoutProfile = new MacroEventProfile
+            {
+                States = new List<string> { "Global", "와이드상태", "다음상태" },
+                InitialState = "와이드상태"
+            };
+
+            // 와이드상태 -> 다음상태 전이
+            var transEvt = new MacroEvent { StateTag = "와이드상태", Name = "전이" };
+            transEvt.Actions.Add(new MacroAction { Type = ActionType.ChangeState, TargetState = "다음상태" });
+            layoutProfile.Events.Add(transEvt);
+
+            // 와이드상태의 너비를 600px로 커스텀 설정
+            layoutProfile.NodeSizes["와이드상태"] = new NodeCanvasSize(600f, 250f);
+
+            MacroLayoutEngine.ComputeSmartLayout(
+                layoutProfile,
+                st => layoutProfile.NodeSizes.TryGetValue(st, out var s) ? s.Height : 220f,
+                st => layoutProfile.NodeSizes.TryGetValue(st, out var s) ? s.Width : 340f
+            );
+
+            var posWide = layoutProfile.NodePositions["와이드상태"];
+            var posNext = layoutProfile.NodePositions["다음상태"];
+
+            // 다음 상태는 와이드상태(600px)의 우측 여백 바깥에 안전하게 배치되어야 함 (80 + 600 + 80 = 760 이상)
+            if (posNext.X < posWide.X + 600f)
+            {
+                Console.WriteLine($"  ❌ [실패] 와이드 노드(600px) 후속 열 배치 충돌: 다음열 X={posNext.X}, 와이드 Right={posWide.X + 600f}");
+                return false;
+            }
+
+            Console.WriteLine("  ✔ [통과] 핀 노드 연속 키 접기/펼치기, 조건 기본값 상시(Always)화, 대형 노드 크기 반응형 자동 정렬 검증 완료 (31개 테스트 완료)");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌ [예외] 5.2.0 신규 기능 테스트 실패: {ex.Message}");
             return false;
         }
     }

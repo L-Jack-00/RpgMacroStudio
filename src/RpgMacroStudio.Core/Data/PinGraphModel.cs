@@ -94,7 +94,8 @@ public enum GraphNodeType
     ChangeState,    // 상태 전환 노드
     VariableControl,// 변수 조작 노드
     Merge,          // 다중 실행 흐름 병합 노드
-    Comment         // 주석 박스
+    Comment,        // 주석 박스
+    KeySequence     // 연속 키 입력 묶음 노드 (접기/펼치기 지원)
 }
 
 /// <summary>
@@ -125,6 +126,12 @@ public class GraphNode
     // 노드 내부 상세 데이터 페이로드 (조건 or 액션)
     public MacroTrigger? TriggerData { get; set; }
     public MacroAction? ActionData { get; set; }
+
+    // 연속 키 입력 묶음(KeySequence) 관련 속성
+    public List<MacroAction>? SequenceActions { get; set; }
+    public bool IsCollapsed { get; set; } = true;
+    public int SequenceStartIndex { get; set; } = -1;
+    public string? SourceEventId { get; set; }
 
     // 부가 설명/메모
     public string? Description { get; set; }

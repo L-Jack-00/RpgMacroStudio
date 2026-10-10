@@ -22,11 +22,33 @@ public record VersionChangeEntry(
 /// </summary>
 public static class VersionInfo
 {
-    public const string CurrentVersion = "5.1.0";
+    public const string CurrentVersion = "5.2.0";
     public const string AppName = "RPG 매크로 스튜디오";
 
     public static readonly List<VersionChangeEntry> History = new()
     {
+        new VersionChangeEntry(
+            "5.2.0",
+            "2026-10-10",
+            "v5.2.0 핀 노드 연속 키 접기/펼치기, 조건 기본값 상시화, 시작 핀 최초 하이라이트 및 노드 크기 반응형 자동 정렬",
+            "v5.2.0 Pin Graph Key Sequence Folding, Default Always Trigger, Start Pin Highlight & Size-Aware Auto-Layout",
+            new List<string>
+            {
+                "[핀 그래프 연속 키 입력 접기/펼치기] 연속된 키보드 및 지연 액션들을 컴팩트한 복합 키 시퀀스 노드로 그룹화하여 [▶ 펼치기]/[▼ 접기] 토글을 지원하며, 캔버스 가로 확장을 극적으로 줄이고 가독성을 극대화했습니다.",
+                "[발동 조건 기본값 '상시(Always)' 변경] 조건 생성 시 기본 조건 유형을 '🔄 무조건 상시 실행'으로 설정하여 신규 이벤트 구성 편의성을 높였습니다.",
+                "[첫 실행 시 시작 노드 핀 하이라이트] 매크로 가동 시 최초 1회 진입 흐름에 한해 시작 노드의 Flow-Out 핀에 선명한 골드 네온 펄스 아우라를 점등하여 흐름의 출발점을 직관적으로 시각화했습니다.",
+                "[노드 크기(너비/높이) 동적 반응형 자동 정렬] FSM 모드와 핀 모드 자동 정렬 시 노드의 커스텀 리사이즈 너비 및 높이를 동적으로 측정하여 열/행 간격을 자동 배정함으로써 노드 간 겹침을 0%로 차단했습니다.",
+                "[매크로 녹화 종료 후 즉시 갱신 및 UI 반응성 개선] 매크로 녹화 종료 시 완료 안내 팝업 전 캔버스 및 리스트뷰를 즉각 갱신하도록 동기화 파이프라인을 개선했습니다."
+            },
+            new List<string>
+            {
+                "[Pin Graph Key Sequence Folding] Bundles consecutive key and wait actions into a compact composite node with [▶ Expand]/[▼ Collapse] toggles, drastically reducing horizontal canvas sprawl.",
+                "[Default Trigger Condition Set to 'Always'] Creating new triggers now defaults to '🔄 Always Active' for faster workflow.",
+                "[First-Run Start Node Pin Highlight] Illuminates the start node's flow-out pin with a radiant gold neon pulsing halo only on initial run to clearly show flow origin.",
+                "[Size-Aware Dynamic Auto-Layout] Computes column and row spacings dynamically based on actual custom node widths and heights, guaranteeing zero overlap across FSM and Pin modes.",
+                "[Instant Refresh on Macro Recording Completion] Synchronizes and redraws canvas and inspector views immediately upon recording stop prior to showing alert dialogs."
+            }
+        ),
         new VersionChangeEntry(
             "5.1.0",
             "2026-10-10",

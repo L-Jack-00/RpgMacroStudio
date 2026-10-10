@@ -148,35 +148,109 @@ public static class PinGraphConverter
                 // B. 행동 노드들 생성
                 float actionOffsetX = eventOffsetX;
                 float actionOffsetY = eventOffsetY;
+                float eventRowMaxH = 95f;
 
-                for (int aIdx = 0; aIdx < evt.Actions.Count; aIdx++)
+                int aIdx = 0;
+                while (aIdx < evt.Actions.Count)
                 {
                     var act = evt.Actions[aIdx];
-                    string actTitle = act.Type switch
-                    {
-                        ActionType.KeyPress => act.KeyMode switch
-                        {
-                            KeyStrokeMode.KeyDown => $"⬇️ 키다운: {act.Key}",
-                            KeyStrokeMode.KeyUp => $"⬆️ 키업: {act.Key}",
-                            _ => $"⌨️ 키: {act.Key}"
-                        },
-                        ActionType.Wait => $"⏳ 대기: {act.WaitDurationMs}ms",
-                        ActionType.MouseClick => act.TargetMode == MouseTargetMode.TriggerDetected ? "🖱️ 감지 위치 클릭" : $"🖱️ 클릭 ({act.CustomX}, {act.CustomY})",
-                        ActionType.VariableControl => $"🔢 변수: {act.VariableName} = {act.VariableValue}",
-                        ActionType.ChangeState => $"🔄 상태 전이: [{act.TargetState}]",
-                        _ => "⚡ 행동"
-                    };
 
-                    var actNode = new GraphNode(actTitle, act.Type == ActionType.ChangeState ? GraphNodeType.ChangeState : GraphNodeType.Action, actionOffsetX, actionOffsetY)
+                    // 연속 키/대기 시퀀스 탐색 (2개 이상의 키/대기 액션이며 적어도 1개의 KeyPress 포함)
+                    int seqEnd = aIdx;
+                    while (seqEnd + 1 < evt.Actions.Count &&
+                           (evt.Actions[seqEnd + 1].Type == ActionType.KeyPress || evt.Actions[seqEnd + 1].Type == ActionType.Wait))
                     {
-                        Id = $"act_{evt.Id}_{aIdx}",
-                        StateTag = state,
-                        ActionData = act,
-                        IsEnabled = evt.IsEnabled,
-                        Width = 220,
-                        Height = 80,
-                        Description = act.Description
-                    };
+                        seqEnd++;
+                    }
+
+                    int seqLen = seqEnd - aIdx + 1;
+                    bool isKeySequence = (seqLen >= 2) && evt.Actions.GetRange(aIdx, seqLen).Any(a => a.Type == ActionType.KeyPress);
+
+                    GraphNode actNode;
+                    if (isKeySequence)
+                    {
+                        var seqActions = evt.Actions.GetRange(aIdx, seqLen);
+                        bool isCollapsed = true;
+                        string nodeId = $"act_{evt.Id}_{aIdx}";
+                        if (profile.PinGraphCollapsedNodes.TryGetValue(nodeId, out bool savedCol))
+                        {
+                            isCollapsed = savedCol;
+                        }
+
+                        // 요약 문자열 빌드
+                        var summaries = new List<string>();
+                        foreach (var a in seqActions)
+                        {
+                            if (a.Type == ActionType.KeyPress)
+                            {
+                                string prefix = a.KeyMode switch
+                                {
+                                    KeyStrokeMode.KeyDown => "⬇️",
+                                    KeyStrokeMode.KeyUp => "⬆️",
+                                    _ => ""
+                                };
+                                summaries.Add($"{prefix}{a.Key}");
+                            }
+                            else if (a.Type == ActionType.Wait)
+                            {
+                                summaries.Add($"+{a.WaitDurationMs}ms");
+                            }
+                        }
+                        string summaryText = string.Join(" ➔ ", summaries);
+                        if (summaryText.Length > 42) summaryText = summaryText.Substring(0, 39) + "...";
+
+                        bool ko = Localization.IsKorean;
+                        string seqTitle = ko ? $"⌨️ 연속 키 입력 ({seqLen}개)" : $"⌨️ Key Sequence ({seqLen})";
+                        float defaultH = isCollapsed ? 75f : Math.Max(90f, 36f + seqLen * 22f);
+
+                        actNode = new GraphNode(seqTitle, GraphNodeType.KeySequence, actionOffsetX, actionOffsetY)
+                        {
+                            Id = nodeId,
+                            StateTag = state,
+                            ActionData = seqActions[0],
+                            SequenceActions = seqActions,
+                            SequenceStartIndex = aIdx,
+                            SourceEventId = evt.Id,
+                            IsCollapsed = isCollapsed,
+                            IsEnabled = evt.IsEnabled,
+                            Width = 240,
+                            Height = defaultH,
+                            Description = summaryText
+                        };
+
+                        aIdx = seqEnd + 1;
+                    }
+                    else
+                    {
+                        string actTitle = act.Type switch
+                        {
+                            ActionType.KeyPress => act.KeyMode switch
+                            {
+                                KeyStrokeMode.KeyDown => $"⬇️ 키다운: {act.Key}",
+                                KeyStrokeMode.KeyUp => $"⬆️ 키업: {act.Key}",
+                                _ => $"⌨️ 키: {act.Key}"
+                            },
+                            ActionType.Wait => $"⏳ 대기: {act.WaitDurationMs}ms",
+                            ActionType.MouseClick => act.TargetMode == MouseTargetMode.TriggerDetected ? "🖱️ 감지 위치 클릭" : $"🖱️ 클릭 ({act.CustomX}, {act.CustomY})",
+                            ActionType.VariableControl => $"🔢 변수: {act.VariableName} = {act.VariableValue}",
+                            ActionType.ChangeState => $"🔄 상태 전이: [{act.TargetState}]",
+                            _ => "⚡ 행동"
+                        };
+
+                        actNode = new GraphNode(actTitle, act.Type == ActionType.ChangeState ? GraphNodeType.ChangeState : GraphNodeType.Action, actionOffsetX, actionOffsetY)
+                        {
+                            Id = $"act_{evt.Id}_{aIdx}",
+                            StateTag = state,
+                            ActionData = act,
+                            IsEnabled = evt.IsEnabled,
+                            Width = 220,
+                            Height = 80,
+                            Description = act.Description
+                        };
+
+                        aIdx++;
+                    }
+
                     if (!ignoreSavedPositions && profile.PinGraphNodePositions.TryGetValue(actNode.Id, out var savedActPos))
                     {
                         actNode.X = savedActPos.X;
@@ -194,7 +268,7 @@ public static class PinGraphConverter
                     actNode.OutputPins.Add(actFlowOut);
 
                     // 마우스 클릭 노드인 경우 좌표 데이터 입력 핀 추가
-                    if (act.Type == ActionType.MouseClick)
+                    if (actNode.ActionData?.Type == ActionType.MouseClick)
                     {
                         var inCoordPin = GraphPin.CreateDataIn("Coord ●", GraphPinDataType.Point);
                         actNode.InputPins.Add(inCoordPin);
@@ -218,6 +292,7 @@ public static class PinGraphConverter
                     previousTailNode = actNode;
                     previousFlowPin = actFlowOut;
 
+                    if (actNode.Height > eventRowMaxH) eventRowMaxH = actNode.Height;
                     if (actNode.Y + actNode.Height > maxEventBottomY)
                     {
                         maxEventBottomY = actNode.Y + actNode.Height;
@@ -226,7 +301,8 @@ public static class PinGraphConverter
                     actionOffsetX += actNode.Width + 50;
                 }
 
-                eventOffsetY += 140;
+                // 동적 행 높이를 반영하여 이벤트 행 Y 간격 산출 (노드 크기 고려)
+                eventOffsetY += eventRowMaxH + 45f;
                 eventOffsetX = stateOriginX + 260;
                 if (eventOffsetY > maxEventBottomY) maxEventBottomY = eventOffsetY;
             }

@@ -67,8 +67,10 @@ public partial class MainForm
                 CurrentSelectedEvent.Actions.AddRange(recordedActions);
                 _isDirty = true;
                 RefreshActionListView(CurrentSelectedEvent);
-                _canvas.Invalidate();
+                SyncAndRefreshAllViews();
                 _classicControl.RefreshSelectedEventItem();
+                _canvas.Update();
+                Update();
 
                 string msg = string.Format(Localization.Get("RecordingFinished"), recordedActions.Count);
                 Log($"[매크로 녹화 완료] {msg}");
@@ -313,18 +315,34 @@ public partial class MainForm
             {
                 if (IsHandleCreated && !IsDisposed)
                 {
-                    BeginInvoke(new Action(() => _canvas.SetActiveAction(evId, actIdx)));
+                    BeginInvoke(new Action(() =>
+                    {
+                        if (_canvas.HighlightStartPinOnFirstRun)
+                        {
+                            _canvas.HighlightStartPinOnFirstRun = false;
+                        }
+                        _canvas.SetActiveAction(evId, actIdx);
+                    }));
                 }
             };
             _harness.OnTriggerFired += (evId, trgIdx) =>
             {
                 if (IsHandleCreated && !IsDisposed)
                 {
-                    BeginInvoke(new Action(() => _canvas.NotifyTriggerFired(evId, trgIdx)));
+                    BeginInvoke(new Action(() =>
+                    {
+                        if (_canvas.HighlightStartPinOnFirstRun)
+                        {
+                            _canvas.HighlightStartPinOnFirstRun = false;
+                        }
+                        _canvas.NotifyTriggerFired(evId, trgIdx);
+                    }));
                 }
             };
 
             _isMacroRunning = true;
+            _canvas.HighlightStartPinOnFirstRun = true;
+            _canvas.Invalidate();
             _btnStart.Text = Localization.Get("BtnPause");
             _btnStart.BackColor = Color.FromArgb(243, 156, 18);
             _btnStart.Enabled = true;
@@ -356,6 +374,8 @@ public partial class MainForm
                         _lblStatus.Text = Localization.Get("StatusStopped");
                         _lblStatus.ForeColor = Color.DarkRed;
                         _canvas.ActiveState = null;
+                        _canvas.HighlightStartPinOnFirstRun = false;
+                        _canvas.Invalidate();
                         AppSettings.PlaySound(SystemSounds.Beep);
                         Log(Localization.IsKorean ? "하네스 루프가 종료되었습니다." : "Harness loop terminated.");
                     }));
@@ -387,6 +407,8 @@ public partial class MainForm
         _lblStatus.Text = Localization.Get("StatusStopped");
         _lblStatus.ForeColor = Color.DarkSlateGray;
         _canvas.ActiveState = null;
+        _canvas.HighlightStartPinOnFirstRun = false;
+        _canvas.Invalidate();
         AppSettings.PlaySound(SystemSounds.Beep);
         Log(Localization.IsKorean ? "사용자가 매크로를 정지했습니다." : "Macro stopped by user.");
     }
@@ -671,7 +693,7 @@ public partial class MainForm
             _canvas.Profile = _profile;
             _classicControl.Profile = _profile;
             _isDirty = true;
-            _canvas.Invalidate();
+            SyncAndRefreshAllViews();
             OnCanvasSelectionChanged(CurrentSelectedState, CurrentSelectedEvent);
             UpdateUndoRedoButtons();
             string detail = string.IsNullOrEmpty(actionName)
@@ -692,7 +714,7 @@ public partial class MainForm
             _canvas.Profile = _profile;
             _classicControl.Profile = _profile;
             _isDirty = true;
-            _canvas.Invalidate();
+            SyncAndRefreshAllViews();
             OnCanvasSelectionChanged(CurrentSelectedState, CurrentSelectedEvent);
             UpdateUndoRedoButtons();
             string detail = string.IsNullOrEmpty(actionName)

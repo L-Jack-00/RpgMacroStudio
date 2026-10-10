@@ -136,7 +136,7 @@ public class MacroAction
 /// </summary>
 public class MacroTrigger
 {
-    public TriggerType Type { get; set; } = TriggerType.TimerInterval;
+    public TriggerType Type { get; set; } = TriggerType.Always;
 
     // 통합 비전 감지 설정 (색상/이미지 일치/불일치)
     public VisionTargetType VisionTarget { get; set; } = VisionTargetType.Color;
@@ -388,6 +388,11 @@ public class MacroEventProfile
     /// 핀 그래프 상의 각 노드별 커스텀 크기 (Width, Height)
     /// </summary>
     public Dictionary<string, NodeCanvasSize> PinGraphNodeSizes { get; set; } = new();
+
+    /// <summary>
+    /// 핀 그래프 상의 연속 키 입력 묶음 등 노드별 접힘/펼침 상태 (nodeId -> isCollapsed)
+    /// </summary>
+    public Dictionary<string, bool> PinGraphCollapsedNodes { get; set; } = new();
 
     /// <summary>
     /// 새로 추가할 상태 노드의 추천 기본 명칭을 생성합니다. (예: "상태 1", "상태 2"...)

@@ -388,6 +388,22 @@ public partial class NodeCanvasControl
             GraphNodeSelected?.Invoke(hitNode);
             Invalidate();
 
+            // KeySequence 노드 접기/펼치기 메뉴
+            if (hitNode.NodeType == GraphNodeType.KeySequence)
+            {
+                string toggleTxt = hitNode.IsCollapsed
+                    ? (ko ? "📂 키 시퀀스 펼치기" : "📂 Expand Key Sequence")
+                    : (ko ? "📁 키 시퀀스 접기" : "📁 Collapse Key Sequence");
+                cms.Items.Add(toggleTxt, null, (s, ev) =>
+                {
+                    hitNode.IsCollapsed = !hitNode.IsCollapsed;
+                    _profile.PinGraphCollapsedNodes[hitNode.Id] = hitNode.IsCollapsed;
+                    hitNode.Height = hitNode.IsCollapsed ? 75f : Math.Max(90f, 36f + (hitNode.SequenceActions?.Count ?? 0) * 22f);
+                    Invalidate();
+                });
+                cms.Items.Add(new ToolStripSeparator());
+            }
+
             // 0. 노드 복사
             cms.Items.Add(ko ? "📋 노드 복사 (Ctrl+C)" : "📋 Copy Node (Ctrl+C)", null, (s, ev) =>
             {
@@ -411,6 +427,28 @@ public partial class NodeCanvasControl
         }
         else
         {
+            cms.Items.Add(ko ? "📁 모든 키 시퀀스 접기" : "📁 Collapse All Key Sequences", null, (s, ev) =>
+            {
+                foreach (var n in _pinGraph.Nodes.Where(n => n.NodeType == GraphNodeType.KeySequence))
+                {
+                    n.IsCollapsed = true;
+                    _profile.PinGraphCollapsedNodes[n.Id] = true;
+                    n.Height = 75f;
+                }
+                Invalidate();
+            });
+            cms.Items.Add(ko ? "📂 모든 키 시퀀스 펼치기" : "📂 Expand All Key Sequences", null, (s, ev) =>
+            {
+                foreach (var n in _pinGraph.Nodes.Where(n => n.NodeType == GraphNodeType.KeySequence))
+                {
+                    n.IsCollapsed = false;
+                    _profile.PinGraphCollapsedNodes[n.Id] = false;
+                    n.Height = Math.Max(90f, 36f + (n.SequenceActions?.Count ?? 0) * 22f);
+                }
+                Invalidate();
+            });
+            cms.Items.Add(new ToolStripSeparator());
+
             cms.Items.Add(ko ? "➕ 새 조건 감지 노드 추가" : "➕ Add Condition Node", null, (s, ev) =>
             {
                 AddPinGraphConditionNode(SelectedState, worldPt);
