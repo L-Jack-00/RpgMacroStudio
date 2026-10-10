@@ -901,7 +901,51 @@ public static class SelfTestRunner
                 return false;
             }
 
-            Console.WriteLine("  ✔ [통과] 저수준 매크로 녹화기(MacroRecorder) 라이프사이클 및 안전 초기화 검증");
+            // 2. 단독 입력(Isolated Tap) 변환 검증 -> KeyDownUp
+            var singleTapEvents = new List<MacroRecorder.RawInputEvent>
+            {
+                new MacroRecorder.RawInputEvent { TimestampMs = 100, Type = MacroRecorder.RawInputType.KeyDown, Key = Keys.Space },
+                new MacroRecorder.RawInputEvent { TimestampMs = 150, Type = MacroRecorder.RawInputType.KeyUp, Key = Keys.Space }
+            };
+            var singleActions = MacroRecorder.ConvertToMacroActions(singleTapEvents);
+            if (singleActions.Count != 1 || singleActions[0].KeyMode != KeyStrokeMode.KeyDownUp || singleActions[0].HoldTimeMs != 50)
+            {
+                Console.WriteLine("  ❌ [실패] 단독 키 녹화 변환 오류 (KeyDownUp 미적용)");
+                return false;
+            }
+
+            // 3. 동시/조합 입력(Overlapping Combo Hold) 변환 검증 -> Shift(KeyDown) -> 1(KeyDownUp) -> Shift(KeyUp)
+            var comboEvents = new List<MacroRecorder.RawInputEvent>
+            {
+                new MacroRecorder.RawInputEvent { TimestampMs = 100, Type = MacroRecorder.RawInputType.KeyDown, Key = Keys.ShiftKey },
+                new MacroRecorder.RawInputEvent { TimestampMs = 200, Type = MacroRecorder.RawInputType.KeyDown, Key = Keys.D1 },
+                new MacroRecorder.RawInputEvent { TimestampMs = 240, Type = MacroRecorder.RawInputType.KeyUp, Key = Keys.D1 },
+                new MacroRecorder.RawInputEvent { TimestampMs = 300, Type = MacroRecorder.RawInputType.KeyUp, Key = Keys.ShiftKey }
+            };
+            var comboActions = MacroRecorder.ConvertToMacroActions(comboEvents);
+            var keyActions = comboActions.Where(a => a.Type == ActionType.KeyPress).ToList();
+            if (keyActions.Count != 3 ||
+                keyActions[0].KeyMode != KeyStrokeMode.KeyDown || keyActions[0].Key != "ShiftKey" ||
+                keyActions[1].KeyMode != KeyStrokeMode.KeyDownUp || keyActions[1].Key != "D1" ||
+                keyActions[2].KeyMode != KeyStrokeMode.KeyUp || keyActions[2].Key != "ShiftKey")
+            {
+                Console.WriteLine("  ❌ [실패] 동시/조합 입력 녹화 변환 오류 (KeyDown/KeyUp 분리 실패)");
+                return false;
+            }
+
+            // 4. 시작 버튼 릴리즈 등 고아 MouseUp 무시 가드 검증
+            var orphanMouseEvents = new List<MacroRecorder.RawInputEvent>
+            {
+                new MacroRecorder.RawInputEvent { TimestampMs = 20, Type = MacroRecorder.RawInputType.MouseUp, MouseButton = MouseButtonType.Left, ScreenPoint = new System.Drawing.Point(50, 50) }
+            };
+            var orphanActions = MacroRecorder.ConvertToMacroActions(orphanMouseEvents);
+            if (orphanActions.Count != 0)
+            {
+                Console.WriteLine("  ❌ [실패] 고아 MouseUp 필터링 실패");
+                return false;
+            }
+
+            Console.WriteLine("  ✔ [통과] 매크로 녹화 라이프사이클, 키다운업/키다운/키업 스마트 분류 및 시작 버튼 릴리즈 필터링 검증");
             return true;
         }
         catch (Exception ex)

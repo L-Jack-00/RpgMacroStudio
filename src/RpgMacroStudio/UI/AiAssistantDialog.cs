@@ -102,7 +102,7 @@ public class AiAssistantDialog : Form
 
         _lblTitle = new Label
         {
-            Text = ko ? "✨ 차세대 AI 매크로 어시스턴트 (v5.0.0)" : "✨ Next-Gen AI Macro Assistant (v5.0.0)",
+            Text = ko ? "✨ 차세대 AI 매크로 어시스턴트" : "✨ Next-Gen AI Macro Assistant",
             Font = AppFontHelper.GetDefaultFont(13f, FontStyle.Bold),
             ForeColor = isDark ? Color.FromArgb(230, 235, 245) : Color.FromArgb(20, 30, 45),
             AutoSize = true,

@@ -101,7 +101,8 @@ public partial class MainForm
                 return;
             }
 
-            _macroRecorder.StartRecording();
+            Rectangle btnBounds = Rectangle.Inflate(_btnRecordMacro.RectangleToScreen(_btnRecordMacro.ClientRectangle), 6, 6);
+            _macroRecorder.StartRecording(btnBounds, AppSettings.Current.RecordHotkey);
             _btnStart.Enabled = false;
             _btnRecordMacro.Text = $"{Localization.Get("BtnStopRecord")} [{AppSettings.Current.RecordHotkey}]";
             _btnRecordMacro.BackColor = Color.FromArgb(192, 57, 43);

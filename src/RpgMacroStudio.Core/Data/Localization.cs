@@ -25,7 +25,7 @@ public static class Localization
             "BtnTemplateWizard" => ko ? "✨ 도우미 마법사" : "✨ Helper Wizard",
             "BtnAiAssistant" => ko ? "🧠 AI 어시스턴트" : "🧠 AI Assistant",
             "TooltipAiAssistant" => ko ? "자연어 기반 AI 매크로 프로필 자동 생성 및 FSM 배치" : "Generate macro profile automatically using AI with natural language",
-            "AiDialogTitle" => ko ? "RPG 매크로 스튜디오 - ✨ AI 매크로 어시스턴트 (v5.0.0)" : "RPG Macro Studio - ✨ AI Macro Assistant (v5.0.0)",
+            "AiDialogTitle" => ko ? "RPG 매크로 스튜디오 - ✨ AI 매크로 어시스턴트" : "RPG Macro Studio - ✨ AI Macro Assistant",
             "AiProviderLabel" => ko ? "AI 프로바이더:" : "AI Provider:",
             "AiApiKeyLabel" => ko ? "API 키 (BYOK):" : "API Key (BYOK):",
             "AiModelLabel" => ko ? "모델명:" : "Model Name:",

@@ -64,7 +64,11 @@ public class MacroRecorder : IDisposable
     [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
     private static extern IntPtr GetModuleHandle(string? lpModuleName);
 
-    private enum RawInputType
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+    private const int VK_LBUTTON = 0x01;
+
+    internal enum RawInputType
     {
         KeyDown,
         KeyUp,
@@ -72,13 +76,20 @@ public class MacroRecorder : IDisposable
         MouseUp
     }
 
-    private class RawInputEvent
+    internal class RawInputEvent
     {
         public long TimestampMs { get; set; }
         public RawInputType Type { get; set; }
         public Keys Key { get; set; }
         public MouseButtonType MouseButton { get; set; }
         public Point ScreenPoint { get; set; }
+    }
+
+    private class TimedAction
+    {
+        public long StartTime { get; set; }
+        public long EndTime { get; set; }
+        public MacroAction Action { get; set; } = null!;
     }
 
     private IntPtr _keyboardHookId = IntPtr.Zero;
@@ -89,6 +100,10 @@ public class MacroRecorder : IDisposable
     private readonly HashSet<Keys> _currentlyPressedKeys = new();
     private readonly HashSet<MouseButtonType> _currentlyPressedMouseButtons = new();
 
+    private Rectangle? _startButtonBounds;
+    private string? _triggerHotkey;
+    private bool _ignoreInitialLeftMouseRelease;
+
     private readonly Stopwatch _stopwatch = new();
     private readonly List<RawInputEvent> _recordedEvents = new();
     private readonly object _lock = new();
@@ -98,7 +113,7 @@ public class MacroRecorder : IDisposable
     public event Action<string>? OnRecordingStatusChanged;
     public event Action<string>? OnInputRecorded;
 
-    public void StartRecording()
+    public void StartRecording(Rectangle? startButtonBounds = null, string? triggerHotkey = null)
     {
         if (IsRecording) return;
 
@@ -107,6 +122,12 @@ public class MacroRecorder : IDisposable
             _recordedEvents.Clear();
             _currentlyPressedKeys.Clear();
             _currentlyPressedMouseButtons.Clear();
+            _startButtonBounds = startButtonBounds;
+            _triggerHotkey = triggerHotkey;
+
+            // 시작 버튼 클릭으로 진입한 경우, 이미 물리적으로 눌려있는 마우스 좌클릭의 release(Up) 이벤트 무시
+            _ignoreInitialLeftMouseRelease = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+
             _stopwatch.Restart();
 
             _keyboardProc = KeyboardHookCallback;
@@ -174,6 +195,14 @@ public class MacroRecorder : IDisposable
             int vkCode = Marshal.ReadInt32(lParam);
             var key = (Keys)vkCode;
 
+            // 녹화 시작 직후(400ms 이내) 시작 트리거 핫키(예: F9) 입력 무시
+            long now = _stopwatch.ElapsedMilliseconds;
+            if (now < 400 && !string.IsNullOrEmpty(_triggerHotkey) &&
+                string.Equals(key.ToString(), _triggerHotkey, StringComparison.OrdinalIgnoreCase))
+            {
+                return CallNextHookEx(_keyboardHookId, nCode, wParam, lParam);
+            }
+
             RawInputType? type = null;
             if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN)
             {
@@ -205,7 +234,6 @@ public class MacroRecorder : IDisposable
 
             if (type.HasValue)
             {
-                long now = _stopwatch.ElapsedMilliseconds;
                 lock (_lock)
                 {
                     _recordedEvents.Add(new RawInputEvent
@@ -229,6 +257,20 @@ public class MacroRecorder : IDisposable
             int msg = wParam.ToInt32();
             var hookStruct = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
             var screenPt = new Point(hookStruct.pt.x, hookStruct.pt.y);
+
+            // 1. 녹화 시작 버튼 클릭 후 손을 뗄 때 발생하는 잔여 MouseUp 무시
+            if (_ignoreInitialLeftMouseRelease && msg == WM_LBUTTONUP)
+            {
+                _ignoreInitialLeftMouseRelease = false;
+                return CallNextHookEx(_mouseHookId, nCode, wParam, lParam);
+            }
+
+            // 2. 녹화 시작 직후(400ms 이내)에 [녹화 시작 버튼] 내부에서 발생한 마우스 이벤트 무시
+            long now = _stopwatch.ElapsedMilliseconds;
+            if (now < 400 && _startButtonBounds.HasValue && _startButtonBounds.Value.Contains(screenPt))
+            {
+                return CallNextHookEx(_mouseHookId, nCode, wParam, lParam);
+            }
 
             RawInputType? type = null;
             MouseButtonType btn = MouseButtonType.Left;
@@ -296,7 +338,7 @@ public class MacroRecorder : IDisposable
 
             if (type.HasValue)
             {
-                long now = _stopwatch.ElapsedMilliseconds;
+                now = _stopwatch.ElapsedMilliseconds;
                 lock (_lock)
                 {
                     _recordedEvents.Add(new RawInputEvent
@@ -314,99 +356,166 @@ public class MacroRecorder : IDisposable
         return CallNextHookEx(_mouseHookId, nCode, wParam, lParam);
     }
 
-    private static List<MacroAction> ConvertToMacroActions(List<RawInputEvent> rawEvents)
+    internal static List<MacroAction> ConvertToMacroActions(List<RawInputEvent> rawEvents)
     {
         var actions = new List<MacroAction>();
         if (rawEvents.Count == 0) return actions;
 
-        long lastEventTime = rawEvents[0].TimestampMs;
-        var pendingKeys = new Dictionary<Keys, long>();
-        var pendingMouseDown = new Dictionary<MouseButtonType, (long Time, Point Pt)>();
+        var timedActions = new List<TimedAction>();
+        var handledEvents = new HashSet<RawInputEvent>();
 
+        // 1. 키보드/마우스 이벤트 분류 (단독 입력 KeyDownUp vs 동시/조합 입력 KeyDown/KeyUp)
         for (int i = 0; i < rawEvents.Count; i++)
         {
             var ev = rawEvents[i];
-
-            long gap = ev.TimestampMs - lastEventTime;
-            if (gap >= 20 && actions.Count > 0)
+            if (ev.Type == RawInputType.KeyDown)
             {
-                actions.Add(new MacroAction
+                // 대응하는 다음 KeyUp 검색
+                RawInputEvent? matchingUp = null;
+                bool hasInterleavedEvent = false;
+
+                for (int j = i + 1; j < rawEvents.Count; j++)
                 {
-                    Type = ActionType.Wait,
-                    WaitDurationMs = (int)gap,
-                    Description = $"대기 {gap}ms"
-                });
-            }
-
-            switch (ev.Type)
-            {
-                case RawInputType.KeyDown:
-                    if (!pendingKeys.ContainsKey(ev.Key))
+                    var nextEv = rawEvents[j];
+                    if (nextEv.Type == RawInputType.KeyUp && nextEv.Key == ev.Key)
                     {
-                        pendingKeys[ev.Key] = ev.TimestampMs;
+                        matchingUp = nextEv;
+                        break;
                     }
-                    break;
+                    // 중간에 다른 키 또는 마우스 이벤트가 개입했는지 감지
+                    hasInterleavedEvent = true;
+                }
 
-                case RawInputType.KeyUp:
-                    int holdTime = 50;
-                    if (pendingKeys.TryGetValue(ev.Key, out long downTime))
+                if (matchingUp != null && !hasInterleavedEvent)
+                {
+                    // [단독 입력]: 다른 키/마우스와 겹치지 않는 순수 단일 키 탭 -> KeyDownUp
+                    int holdTime = Math.Clamp((int)(matchingUp.TimestampMs - ev.TimestampMs), 15, 5000);
+                    timedActions.Add(new TimedAction
                     {
-                        holdTime = Math.Clamp((int)(ev.TimestampMs - downTime), 10, 5000);
-                        pendingKeys.Remove(ev.Key);
-                    }
-                    actions.Add(new MacroAction
-                    {
-                        Type = ActionType.KeyPress,
-                        Key = ev.Key.ToString(),
-                        HoldTimeMs = holdTime,
-                        PostDelayMs = 30,
-                        Description = $"키 입력: {ev.Key} ({holdTime}ms)"
+                        StartTime = ev.TimestampMs,
+                        EndTime = ev.TimestampMs + holdTime,
+                        Action = new MacroAction
+                        {
+                            Type = ActionType.KeyPress,
+                            Key = ev.Key.ToString(),
+                            KeyMode = KeyStrokeMode.KeyDownUp,
+                            HoldTimeMs = holdTime,
+                            PostDelayMs = 0,
+                            Description = $"키 입력: [{AppKeyHelper.FormatKey(ev.Key.ToString())}] ({holdTime}ms)"
+                        }
                     });
-                    break;
-
-                case RawInputType.MouseDown:
-                    pendingMouseDown[ev.MouseButton] = (ev.TimestampMs, ev.ScreenPoint);
-                    break;
-
-                case RawInputType.MouseUp:
-                    Point pt = ev.ScreenPoint;
-                    int mouseHold = 30;
-                    if (pendingMouseDown.TryGetValue(ev.MouseButton, out var downInfo))
+                    handledEvents.Add(ev);
+                    handledEvents.Add(matchingUp);
+                }
+                else
+                {
+                    // [동시/조합 입력]: 키를 누른 채 다른 키/마우스가 동작함 -> KeyDown 분리
+                    timedActions.Add(new TimedAction
                     {
-                        mouseHold = Math.Clamp((int)(ev.TimestampMs - downInfo.Time), 10, 3000);
-                        pt = downInfo.Pt;
-                        pendingMouseDown.Remove(ev.MouseButton);
+                        StartTime = ev.TimestampMs,
+                        EndTime = ev.TimestampMs,
+                        Action = new MacroAction
+                        {
+                            Type = ActionType.KeyPress,
+                            Key = ev.Key.ToString(),
+                            KeyMode = KeyStrokeMode.KeyDown,
+                            HoldTimeMs = 0,
+                            PostDelayMs = 0,
+                            Description = $"⬇️ 키다운: [{AppKeyHelper.FormatKey(ev.Key.ToString())}]"
+                        }
+                    });
+                    handledEvents.Add(ev);
+                }
+            }
+            else if (ev.Type == RawInputType.KeyUp)
+            {
+                // 이미 KeyDownUp으로 묶이지 않은 KeyUp -> 개별 KeyUp 액션 생성
+                if (!handledEvents.Contains(ev))
+                {
+                    timedActions.Add(new TimedAction
+                    {
+                        StartTime = ev.TimestampMs,
+                        EndTime = ev.TimestampMs,
+                        Action = new MacroAction
+                        {
+                            Type = ActionType.KeyPress,
+                            Key = ev.Key.ToString(),
+                            KeyMode = KeyStrokeMode.KeyUp,
+                            HoldTimeMs = 0,
+                            PostDelayMs = 0,
+                            Description = $"⬆️ 키업: [{AppKeyHelper.FormatKey(ev.Key.ToString())}]"
+                        }
+                    });
+                    handledEvents.Add(ev);
+                }
+            }
+            else if (ev.Type == RawInputType.MouseDown)
+            {
+                // 대응하는 MouseUp 탐색
+                RawInputEvent? matchingMouseUp = null;
+                for (int j = i + 1; j < rawEvents.Count; j++)
+                {
+                    if (rawEvents[j].Type == RawInputType.MouseUp && rawEvents[j].MouseButton == ev.MouseButton)
+                    {
+                        matchingMouseUp = rawEvents[j];
+                        break;
                     }
-                    actions.Add(new MacroAction
+                }
+
+                long endTime = matchingMouseUp?.TimestampMs ?? ev.TimestampMs;
+                timedActions.Add(new TimedAction
+                {
+                    StartTime = ev.TimestampMs,
+                    EndTime = endTime,
+                    Action = new MacroAction
                     {
                         Type = ActionType.MouseClick,
                         MouseButton = ev.MouseButton,
                         TargetMode = MouseTargetMode.Coordinates,
-                        CustomX = pt.X,
-                        CustomY = pt.Y,
-                        Description = $"마우스 {ev.MouseButton} 클릭 ({pt.X}, {pt.Y})"
-                    });
-                    break;
+                        CustomX = ev.ScreenPoint.X,
+                        CustomY = ev.ScreenPoint.Y,
+                        Description = $"🖱️ 마우스 {ev.MouseButton} 클릭 ({ev.ScreenPoint.X}, {ev.ScreenPoint.Y})"
+                    }
+                });
+                handledEvents.Add(ev);
+                if (matchingMouseUp != null)
+                {
+                    handledEvents.Add(matchingMouseUp);
+                }
             }
-
-            lastEventTime = ev.TimestampMs;
+            // RawInputType.MouseUp 중 handledEvents에 없는 것은 시작 버튼 릴리즈 등 고아 이벤트이므로 완전 무시
         }
 
-        foreach (var kvp in pendingKeys)
+        // 2. 타임라인 순으로 정렬
+        timedActions.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
+
+        // 3. 지연(Wait) 액션 자동 삽입
+        var actionsWithWaits = new List<MacroAction>();
+        long lastEndTime = -1;
+
+        for (int i = 0; i < timedActions.Count; i++)
         {
-            actions.Add(new MacroAction
+            var ta = timedActions[i];
+            if (lastEndTime >= 0)
             {
-                Type = ActionType.KeyPress,
-                Key = kvp.Key.ToString(),
-                HoldTimeMs = 50,
-                PostDelayMs = 30,
-                Description = $"키 입력: {kvp.Key} (50ms)"
-            });
+                long gap = ta.StartTime - lastEndTime;
+                if (gap >= 20)
+                {
+                    actionsWithWaits.Add(new MacroAction
+                    {
+                        Type = ActionType.Wait,
+                        WaitDurationMs = (int)gap,
+                        Description = $"대기 {gap}ms"
+                    });
+                }
+            }
+            actionsWithWaits.Add(ta.Action);
+            lastEndTime = Math.Max(lastEndTime, ta.EndTime);
         }
 
-        // 연속된 대기(Wait) 액션 자동 합산(Merge/Coalesce)
+        // 4. 연속된 대기(Wait) 액션 자동 합산
         var mergedActions = new List<MacroAction>();
-        foreach (var act in actions)
+        foreach (var act in actionsWithWaits)
         {
             if (act.Type == ActionType.Wait && mergedActions.Count > 0 && mergedActions[^1].Type == ActionType.Wait)
             {
@@ -417,6 +526,35 @@ public class MacroRecorder : IDisposable
             {
                 mergedActions.Add(act);
             }
+        }
+
+        // 5. 키 영구 눌림 방지 안전망: KeyDown만 있고 대응 KeyUp이 없는 미해제 키가 있으면 마지막에 KeyUp 추가
+        var unreleasedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var act in mergedActions)
+        {
+            if (act.Type == ActionType.KeyPress)
+            {
+                if (act.KeyMode == KeyStrokeMode.KeyDown)
+                {
+                    unreleasedKeys.Add(act.Key);
+                }
+                else if (act.KeyMode == KeyStrokeMode.KeyUp)
+                {
+                    unreleasedKeys.Remove(act.Key);
+                }
+            }
+        }
+
+        foreach (var unreleased in unreleasedKeys)
+        {
+            mergedActions.Add(new MacroAction
+            {
+                Type = ActionType.KeyPress,
+                Key = unreleased,
+                KeyMode = KeyStrokeMode.KeyUp,
+                PostDelayMs = 0,
+                Description = $"⬆️ 키업: [{AppKeyHelper.FormatKey(unreleased)}] (녹화 종료 자동 해제)"
+            });
         }
 
         return mergedActions;

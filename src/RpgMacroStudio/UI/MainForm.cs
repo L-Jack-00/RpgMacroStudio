@@ -158,14 +158,7 @@ public partial class MainForm : Form
     {
         InitializeComponent();
         SetLogCollapsed(AppSettings.Current.IsLogCollapsed);
-        if (AppSettings.Current.IsClassicView)
-        {
-            SwitchViewMode(AppViewMode.ClassicTree);
-        }
-        else
-        {
-            SwitchViewMode(AppViewMode.CanvasFsm);
-        }
+        SwitchViewMode(AppViewMode.CanvasPinGraph);
         ApplyLanguage();
         ApplyTheme(AppSettings.Current.IsDarkMode);
         InitGlobalHotkeys();
@@ -299,19 +292,7 @@ public partial class MainForm : Form
         };
         _toolbarToolTip.SetToolTip(_btnAutoLayout, Localization.IsKorean ? "노드 자동 정렬" : "Auto Layout Nodes");
 
-        // 브라우저 탭 스타일 3대 뷰 전환 버튼 (이모지는 Segoe UI Emoji Regular로 안 깨지게, 텍스트는 Segoe UI Bold로 선명하게 합성 렌더링)
-        _btnTabFsm = new Button
-        {
-            Height = 30,
-            AutoSize = true,
-            Padding = new Padding(8, 0, 8, 0),
-            Margin = new Padding(0, 0, 2, 0),
-            FlatStyle = FlatStyle.Flat,
-            Cursor = Cursors.Hand
-        };
-        _btnTabFsm.Click += (s, e) => SwitchViewMode(AppViewMode.CanvasFsm);
-        SetupTabButtonPaint(_btnTabFsm, () => CurrentViewMode == AppViewMode.CanvasFsm, () => Localization.IsKorean ? "📦 FSM 모드" : "📦 FSM Mode", () => "📦");
-
+        // 브라우저 탭 스타일 3대 뷰 전환 버튼 (탭 순서: 🔀 핀 모드 -> 📦 FSM 모드 -> ☰ 클래식 모드)
         _btnTabPin = new Button
         {
             Height = 30,
@@ -323,6 +304,18 @@ public partial class MainForm : Form
         };
         _btnTabPin.Click += (s, e) => SwitchViewMode(AppViewMode.CanvasPinGraph);
         SetupTabButtonPaint(_btnTabPin, () => CurrentViewMode == AppViewMode.CanvasPinGraph, () => Localization.IsKorean ? "🔀 핀 모드" : "🔀 Pin Mode", () => "🔀");
+
+        _btnTabFsm = new Button
+        {
+            Height = 30,
+            AutoSize = true,
+            Padding = new Padding(8, 0, 8, 0),
+            Margin = new Padding(0, 0, 2, 0),
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand
+        };
+        _btnTabFsm.Click += (s, e) => SwitchViewMode(AppViewMode.CanvasFsm);
+        SetupTabButtonPaint(_btnTabFsm, () => CurrentViewMode == AppViewMode.CanvasFsm, () => Localization.IsKorean ? "📦 FSM 모드" : "📦 FSM Mode", () => "📦");
 
         _btnTabClassic = new Button
         {
@@ -371,7 +364,7 @@ public partial class MainForm : Form
         {
             _btnOpen, _btnSave, _btnUndo, _btnRedo, _btnStart, _btnStop,
             _btnAddStateNode, _btnAddEventToNode, _btnAutoLayout,
-            _btnTabFsm, _btnTabPin, _btnTabClassic,
+            _btnTabPin, _btnTabFsm, _btnTabClassic,
             _btnTemplateWizard, _btnAiAssistant, _btnSettings
         });
 
