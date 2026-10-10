@@ -53,11 +53,12 @@ public static class SelfTestRunner
         allPassed &= TestNodeClipboardAndUndoRedoIntegrity();
         allPassed &= TestKeyStrokeModesAndSimultaneousInput();
         allPassed &= TestKeySequenceFoldingAndSizeAwareAutoLayout();
+        allPassed &= TestMouseStrokeModesAndNoNodesHighlight();
 
         if (allPassed)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("\n🎉 [모든 테스트 통과] 31개 핵심 모듈 검증 성공! v5.2.0 핀 노드 접기, 상시 기본조건, 노드 크기 자동정렬 및 무결성 검증 완료.");
+            Console.WriteLine("\n🎉 [모든 테스트 통과] 32개 핵심 모듈 검증 성공! v5.3.0 마우스 다운/업 세분화, 빈 캔버스 시작 핀 하이라이트 및 녹화 훅 무결성 검증 완료.");
             Console.ResetColor();
         }
         else
@@ -2466,6 +2467,98 @@ public static class SelfTestRunner
         catch (Exception ex)
         {
             Console.WriteLine($"  ❌ [예외] 5.2.0 신규 기능 테스트 실패: {ex.Message}");
+            return false;
+        }
+    }
+
+    private static bool TestMouseStrokeModesAndNoNodesHighlight()
+    {
+        Console.WriteLine("\n[검증 32] v5.3.0 마우스 다운/업 세분화, 빈 캔버스 시작 핀 하이라이트 및 녹화 훅 무결성 검증");
+        try
+        {
+            // 1. 마우스 스트로크 모드 직렬화/역직렬화 검증
+            var testAction = new MacroAction
+            {
+                Type = ActionType.MouseClick,
+                MouseButton = MouseButtonType.Right,
+                MouseMode = MouseStrokeMode.MouseDown,
+                HoldTimeMs = 50,
+                PostDelayMs = 100,
+                CustomX = 300,
+                CustomY = 400
+            };
+
+            string json = System.Text.Json.JsonSerializer.Serialize(testAction);
+            var deserialized = System.Text.Json.JsonSerializer.Deserialize<MacroAction>(json);
+            if (deserialized == null || deserialized.MouseMode != MouseStrokeMode.MouseDown || deserialized.MouseButton != MouseButtonType.Right)
+            {
+                Console.WriteLine("  ❌ [실패] MouseStrokeMode 직렬화/역직렬화 불일치");
+                return false;
+            }
+
+            // 2. WindowsInputSimulator 마우스 버튼 추적 및 자가 치유 안전 해제 검증
+            WindowsInputSimulator.ReleaseAllPressedInputs();
+            WindowsInputSimulator.TrackPressedMouseButtonForTesting(MouseButtonType.Left);
+            WindowsInputSimulator.TrackPressedMouseButtonForTesting(MouseButtonType.Right);
+            if (WindowsInputSimulator.GetActivePressedMouseButtons().Count != 2)
+            {
+                Console.WriteLine("  ❌ [실패] 마우스 버튼 전역 추적 누락");
+                return false;
+            }
+
+            WindowsInputSimulator.ReleaseAllPressedInputs();
+            if (WindowsInputSimulator.GetActivePressedMouseButtons().Count != 0)
+            {
+                Console.WriteLine("  ❌ [실패] ReleaseAllPressedInputs 후 마우스 버튼 미해제");
+                return false;
+            }
+
+            // 3. MacroRecorder 마우스 드래그/동시 입력 스마트 분리 변환 검증
+            var rawMouseEvents = new List<MacroRecorder.RawInputEvent>
+            {
+                new MacroRecorder.RawInputEvent { TimestampMs = 100, Type = MacroRecorder.RawInputType.MouseDown, MouseButton = MouseButtonType.Left, ScreenPoint = new System.Drawing.Point(100, 200) },
+                new MacroRecorder.RawInputEvent { TimestampMs = 150, Type = MacroRecorder.RawInputType.KeyDown, Key = System.Windows.Forms.Keys.A },
+                new MacroRecorder.RawInputEvent { TimestampMs = 200, Type = MacroRecorder.RawInputType.KeyUp, Key = System.Windows.Forms.Keys.A },
+                new MacroRecorder.RawInputEvent { TimestampMs = 250, Type = MacroRecorder.RawInputType.MouseUp, MouseButton = MouseButtonType.Left, ScreenPoint = new System.Drawing.Point(150, 200) }
+            };
+
+            var actions = MacroRecorder.ConvertToMacroActions(rawMouseEvents);
+            var mouseActs = actions.Where(a => a.Type == ActionType.MouseClick).ToList();
+            if (mouseActs.Count != 2 ||
+                mouseActs[0].MouseMode != MouseStrokeMode.MouseDown ||
+                mouseActs[1].MouseMode != MouseStrokeMode.MouseUp)
+            {
+                Console.WriteLine("  ❌ [실패] 마우스 드래그/복합 입력 변환 오류 (MouseDown/MouseUp 스마트 분리 실패)");
+                return false;
+            }
+
+            // 4. 노드가 없을 때의 핀 그래프 시작 노드 출력 핀 검증
+            var emptyProfile = new MacroEventProfile
+            {
+                States = new List<string> { "Global", "기본 상태" },
+                InitialState = "기본 상태"
+            };
+            var emptyGraph = PinGraphConverter.FromProfile(emptyProfile);
+            bool hasNoOtherNodes = emptyGraph.Nodes.Count(n => n.NodeType != GraphNodeType.Start) == 0;
+            if (!hasNoOtherNodes)
+            {
+                Console.WriteLine("  ❌ [실패] 빈 프로필 핀 그래프에 불필요한 노드 존재");
+                return false;
+            }
+
+            var startNode = emptyGraph.Nodes.FirstOrDefault(n => n.NodeType == GraphNodeType.Start);
+            if (startNode == null || !startNode.OutputPins.Any(p => p.Direction == GraphPinDirection.Output))
+            {
+                Console.WriteLine("  ❌ [실패] 시작 노드 또는 출력 Flow 핀 누락");
+                return false;
+            }
+
+            Console.WriteLine("  ✔ [통과] v5.3.0 마우스 다운/업 세분화, 전역 자가 치유 안전망, 드래그 녹화 분리 및 빈 캔버스 시작 핀 무결성 검증 완료 (32개 테스트 완료)");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌ [예외] 5.3.0 마우스/하이라이트 테스트 실패: {ex.Message}");
             return false;
         }
     }

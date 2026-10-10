@@ -581,8 +581,7 @@ public class EventMacroHarness
                                     {
                                         int clickX = matchResult.Location.X + actTemplate.Width / 2 + originX;
                                         int clickY = matchResult.Location.Y + actTemplate.Height / 2 + originY;
-                                        Log($"  - 🖱️ 이미지 탐색 성공: ({clickX}, {clickY}) [{action.MouseButton}] 클릭");
-                                        WindowsInputSimulator.SendMouseClick(clickX, clickY, action.MouseButton);
+                                        ExecuteMouseAction(action, clickX, clickY, "이미지 탐색 성공");
                                     }
                                     else
                                     {
@@ -602,13 +601,11 @@ public class EventMacroHarness
                     }
                     else if (action.TargetMode == MouseTargetMode.TriggerDetected || action.ClickDetectedLocation)
                     {
-                        Log($"  - 🖱️ 조건 감지 위치 클릭: ({detectedPoint.X}, {detectedPoint.Y}) [{action.MouseButton}]");
-                        WindowsInputSimulator.SendMouseClick(detectedPoint.X, detectedPoint.Y, action.MouseButton);
+                        ExecuteMouseAction(action, detectedPoint.X, detectedPoint.Y, "조건 감지 위치");
                     }
                     else
                     {
-                        Log($"  - 🖱️ 좌표 클릭: ({action.CustomX}, {action.CustomY}) [{action.MouseButton}]");
-                        WindowsInputSimulator.SendMouseClick(action.CustomX, action.CustomY, action.MouseButton);
+                        ExecuteMouseAction(action, action.CustomX, action.CustomY, "좌표");
                     }
                     break;
 
@@ -643,6 +640,28 @@ public class EventMacroHarness
     {
         OnActionExecuting?.Invoke(evt.Id, -1);
     }
+    }
+
+    private void ExecuteMouseAction(MacroAction action, int clickX, int clickY, string modeLabel)
+    {
+        int hold = action.HoldTimeMs > 0 ? action.HoldTimeMs : 35;
+        int post = action.PostDelayMs;
+
+        if (action.MouseMode == MouseStrokeMode.MouseDown)
+        {
+            WindowsInputSimulator.SendMouseDown(clickX, clickY, action.MouseButton, post);
+            Log($"  - ⬇️ 마우스다운: ({clickX}, {clickY}) [{action.MouseButton}] ({modeLabel})");
+        }
+        else if (action.MouseMode == MouseStrokeMode.MouseUp)
+        {
+            WindowsInputSimulator.SendMouseUp(clickX, clickY, action.MouseButton, post);
+            Log($"  - ⬆️ 마우스업: ({clickX}, {clickY}) [{action.MouseButton}] ({modeLabel})");
+        }
+        else
+        {
+            WindowsInputSimulator.SendMouseClick(clickX, clickY, action.MouseButton, hold, post);
+            Log($"  - 🖱️ 마우스 클릭: ({clickX}, {clickY}) [{action.MouseButton}] ({hold}ms, {modeLabel})");
+        }
     }
 
     private int _recentTransitionCount = 0;

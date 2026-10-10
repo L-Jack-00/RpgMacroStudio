@@ -41,16 +41,36 @@ internal static class Program
         if (args.Length > 0 && args[0].Equals("--test", StringComparison.OrdinalIgnoreCase))
         {
             AttachConsole(ATTACH_PARENT_PROCESS);
+            using var fileLog = new StreamWriter("test_output.log", false, System.Text.Encoding.UTF8) { AutoFlush = true };
             var stdOut = Console.OpenStandardOutput();
             var writer = new StreamWriter(stdOut, System.Text.Encoding.UTF8) { AutoFlush = true };
-            Console.SetOut(writer);
+            
+            var origOut = Console.Out;
+            // Write to both Console and fileLog
+            var combined = new Action<string>(msg => {
+                try { Console.WriteLine(msg); } catch {}
+                try { fileLog.WriteLine(msg); } catch {}
+            });
+
+            Console.SetOut(fileLog);
 
             bool success = SelfTestRunner.RunAllTests();
-            success &= TestInspectorLayout();
-            success &= TestClassicViewLayout();
-            success &= TestSettingsFormLayout();
-            success &= TestAiAssistantDialogLayout();
-            success &= TestDarkThemeAndScrollbarIntegrity();
+            fileLog.WriteLine($"[SelfTestRunner] Result: {success}");
+            bool insp = TestInspectorLayout();
+            fileLog.WriteLine($"[TestInspectorLayout] Result: {insp}");
+            bool classic = TestClassicViewLayout();
+            fileLog.WriteLine($"[TestClassicViewLayout] Result: {classic}");
+            bool settings = TestSettingsFormLayout();
+            fileLog.WriteLine($"[TestSettingsFormLayout] Result: {settings}");
+            bool ai = TestAiAssistantDialogLayout();
+            fileLog.WriteLine($"[TestAiAssistantDialogLayout] Result: {ai}");
+            bool dark = TestDarkThemeAndScrollbarIntegrity();
+            fileLog.WriteLine($"[TestDarkThemeAndScrollbarIntegrity] Result: {dark}");
+            
+            success &= insp & classic & settings & ai & dark;
+            fileLog.WriteLine($"[Overall] Success: {success}");
+            fileLog.Flush();
+
             Environment.Exit(success ? 0 : 1);
             return;
         }

@@ -501,7 +501,8 @@ public partial class NodeCanvasControl
             pinColor = Color.White;
         }
 
-        bool isStartPinHighlight = HighlightStartPinOnFirstRun && node.NodeType == GraphNodeType.Start && pin.Direction == GraphPinDirection.Output;
+        bool hasNoNodes = (_profile == null || _profile.Events.Count == 0 || PinGraph.Nodes.Count(n => n.NodeType != GraphNodeType.Start) == 0);
+        bool isStartPinHighlight = node.NodeType == GraphNodeType.Start && pin.Direction == GraphPinDirection.Output && (hasNoNodes || HighlightStartPinOnFirstRun);
 
         // 와이어 드래그 중인 핀과의 호환성 검사 및 테두리 펄스/네온 하이라이트
         bool isCompatible = false;

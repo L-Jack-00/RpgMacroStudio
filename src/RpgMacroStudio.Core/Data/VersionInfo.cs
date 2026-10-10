@@ -22,11 +22,33 @@ public record VersionChangeEntry(
 /// </summary>
 public static class VersionInfo
 {
-    public const string CurrentVersion = "5.2.0";
+    public const string CurrentVersion = "5.3.0";
     public const string AppName = "RPG 매크로 스튜디오";
 
     public static readonly List<VersionChangeEntry> History = new()
     {
+        new VersionChangeEntry(
+            "5.3.0",
+            "2026-10-10",
+            "v5.3.0 마우스 다운/업 세분화, 노드 뷰 시작 핀 상시 안내 하이라이트 및 녹화 훅 안정화",
+            "v5.3.0 Mouse Down/Up Segmentation, Pin Graph Start Pin Always-Glow & Recording Hook Stability",
+            new List<string>
+            {
+                "[마우스 입력 옵션 세분화(다운업/다운/업)] 마우스 클릭을 키보드와 동일하게 '다운업(누르고 뗌, 기본값)', '마우스다운(누름 유지/드래그)', '마우스업(손 뗌)'의 3단계로 세분화하여 마우스 드래그, 다중 버튼 동시 입력, 누름 시간(Hold Time) 및 클릭 후 지연(Post Delay)을 완벽 지원합니다.",
+                "[마우스 안전 해제 및 자가 치유 안전망] 매크로 일시정지, 정지, 비상 탈출(ESC) 또는 예외 시 물리적으로 눌려 있던 모든 마우스 버튼(좌/우/휠/사이드)을 키보드와 함께 강제 자동 해제하여 마우스 먹통을 원천 차단했습니다.",
+                "[노드 뷰 시작 핀 상시 하이라이트 안내] 핀 그래프 모드에서 배치된 노드가 없을 때, 시작 노드의 Flow-Out 핀에 골드 네온 펄스 아우라를 상시 표시하여 매크로 구성 진입점을 직관적으로 안내합니다.",
+                "[매크로 녹화 훅 가로채기 및 이벤트 영속 바인딩] 녹화 중단 단축키(F10) 입력 시 Low-level 훅에서 즉각 가로채어 매크로 커맨드에 오입력되는 문제를 원천 차단하였으며, 녹화 중 캔버스를 클릭하여 선택이 해제되더라도 녹화 대상 이벤트에 정상 바인딩되어 데이터가 유실되지 않도록 보장했습니다.",
+                "[시작 모드 및 UI 탭 기본값 개편] 프로그램 시작 시 직관적인 핀 노드 모드가 기본으로 열리도록 설정하고, 탭 순서를 [핀 모드 / FSM 모드 / 클래식 모드] 순으로 재배치하였으며 AI 어시스턴트 창 상단 버전 표기를 정돈했습니다."
+            },
+            new List<string>
+            {
+                "[Mouse Stroke Segmentation (Down-Up / Down / Up)] Segmented mouse actions into 'Down-Up (Click, Default)', 'Mouse Down (Hold / Drag)', and 'Mouse Up (Release)', fully empowering drag-and-drop, multi-button concurrency, customizable hold duration, and post-delays.",
+                "[Mouse Stuck-Prevention Self-Healing Net] Automatically releases any held mouse buttons (Left/Right/Middle/XButtons) together with held keys on pause, stop, emergency escape (ESC), or exceptions.",
+                "[Pin Graph Start Pin Always-Glow Guidance] Permanently illuminates the start node's Flow-Out pin with a pulsing gold neon aura when there are no nodes on the canvas, guiding users intuitively to the workflow entry point.",
+                "[Recording Hook Interception & Target Event Binding] Intercepts recording stop hotkey (F10) in the low-level hook to prevent unwanted key recording, and firmly locks the target event during recording to prevent action loss upon canvas de-selection.",
+                "[Default View & UI Polish] Defaults to Pin Graph mode on startup, organizes tabs as [Pin Mode / FSM Mode / Classic Mode], and refines AI Assistant header appearance."
+            }
+        ),
         new VersionChangeEntry(
             "5.2.0",
             "2026-10-10",

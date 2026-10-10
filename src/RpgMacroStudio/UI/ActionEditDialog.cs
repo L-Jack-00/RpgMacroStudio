@@ -34,6 +34,11 @@ public class ActionEditDialog : Form
 
     // Mouse 공통 컨트롤
     private CustomComboBox _cboMouseButton = null!;
+    private CustomComboBox _cboMouseStrokeMode = null!;
+    private Label _lblMouseHold = null!;
+    private NumericUpDown _numMouseHold = null!;
+    private Label _lblMousePost = null!;
+    private NumericUpDown _numMousePost = null!;
     private CustomComboBox _cboMouseMode = null!;
 
     // Mouse: 좌표 모드 컨트롤
@@ -83,8 +88,8 @@ public class ActionEditDialog : Form
         bool ko = Localization.IsKorean;
 
         Text = ko ? "이벤트 행동(커맨드) 설정" : "Action Command Settings";
-        Size = new Size(540, 500);
-        MinimumSize = new Size(540, 500);
+        Size = new Size(540, 530);
+        MinimumSize = new Size(540, 530);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         StartPosition = FormStartPosition.CenterParent;
         MaximizeBox = false;
@@ -148,10 +153,10 @@ public class ActionEditDialog : Form
         _pnlWait.Controls.AddRange(new Control[] { lblWait, _numWait, lblWaitHint });
 
         // 3. Mouse Panel
-        _pnlMouse = new Panel { Left = 20, Top = 60, Width = 485, Height = 340, Visible = false };
+        _pnlMouse = new Panel { Left = 20, Top = 60, Width = 485, Height = 360, Visible = false };
 
-        var lblMouseBtn = new Label { Text = ko ? "마우스 버튼:" : "Mouse Button:", Left = 10, Top = 11, Width = 85 };
-        _cboMouseButton = new CustomComboBox { Left = 100, Top = 8, Width = 180, DropDownStyle = ComboBoxStyle.DropDownList };
+        var lblMouseBtn = new Label { Text = ko ? "마우스 버튼:" : "Button:", Left = 10, Top = 11, Width = 75 };
+        _cboMouseButton = new CustomComboBox { Left = 90, Top = 8, Width = 140, DropDownStyle = ComboBoxStyle.DropDownList };
         _cboMouseButton.Items.AddRange(new object[]
         {
             ko ? "Left (좌클릭)" : "Left Click",
@@ -161,8 +166,25 @@ public class ActionEditDialog : Form
             ko ? "XButton2 (측면 2)" : "XButton 2 (Side 2)"
         });
 
-        var lblMode = new Label { Text = ko ? "클릭 위치 방식:" : "Target Mode:", Left = 10, Top = 48, Width = 100 };
-        _cboMouseMode = new CustomComboBox { Left = 115, Top = 45, Width = 355, DropDownStyle = ComboBoxStyle.DropDownList };
+        var lblMouseStroke = new Label { Text = ko ? "동작 방식:" : "Action:", Left = 240, Top = 11, Width = 65 };
+        _cboMouseStrokeMode = new CustomComboBox { Left = 310, Top = 8, Width = 160, DropDownStyle = ComboBoxStyle.DropDownList };
+        _cboMouseStrokeMode.Items.AddRange(new object[]
+        {
+            ko ? "⬇️⬆️ 다운업 (누르고 뗌)" : "⬇️⬆️ Down-Up (Click)",
+            ko ? "⬇️ 마우스다운 (누름 유지)" : "⬇️ Mouse Down (Hold)",
+            ko ? "⬆️ 마우스업 (손 뗌)" : "⬆️ Mouse Up (Release)"
+        });
+        _cboMouseStrokeMode.SelectedIndex = 0;
+        _cboMouseStrokeMode.SelectedIndexChanged += (s, e) => UpdateMouseStrokeModeUi();
+
+        _lblMouseHold = new Label { Text = ko ? "누름 시간(ms):" : "Hold (ms):", Left = 10, Top = 46, Width = 95 };
+        _numMouseHold = new NumericUpDown { Left = 110, Top = 43, Width = 80, Minimum = 10, Maximum = 5000, Value = 35 };
+
+        _lblMousePost = new Label { Text = ko ? "클릭 후 지연(ms):" : "Post delay (ms):", Left = 210, Top = 46, Width = 105 };
+        _numMousePost = new NumericUpDown { Left = 320, Top = 43, Width = 80, Minimum = 0, Maximum = 10000, Value = 50 };
+
+        var lblMode = new Label { Text = ko ? "클릭 위치 방식:" : "Target Mode:", Left = 10, Top = 80, Width = 95 };
+        _cboMouseMode = new CustomComboBox { Left = 110, Top = 77, Width = 360, DropDownStyle = ComboBoxStyle.DropDownList };
         _cboMouseMode.Items.AddRange(new object[]
         {
             ko ? "🎯 특정 좌표 (X, Y) 클릭" : "🎯 Click Specific Coordinates (X, Y)",
@@ -172,7 +194,7 @@ public class ActionEditDialog : Form
         _cboMouseMode.SelectedIndexChanged += (s, e) => UpdateMouseSubPanels();
 
         // 3-A. 좌표 모드
-        _pnlCoordMode = new Panel { Left = 10, Top = 85, Width = 465, Height = 240, Visible = false };
+        _pnlCoordMode = new Panel { Left = 10, Top = 115, Width = 465, Height = 220, Visible = false };
         var lblX = new Label { Text = ko ? "X 좌표:" : "X Coord:", Left = 10, Top = 15, Width = 60 };
         _numX = new NumericUpDown { Left = 75, Top = 12, Width = 90, Maximum = 10000 };
         var lblY = new Label { Text = ko ? "Y 좌표:" : "Y Coord:", Left = 180, Top = 15, Width = 60 };
@@ -203,7 +225,7 @@ public class ActionEditDialog : Form
         _pnlCoordMode.Controls.AddRange(new Control[] { lblX, _numX, lblY, _numY, _btnPickCoords, lblCoordHint });
 
         // 3-B. 이미지 탐색 모드
-        _pnlImgMode = new Panel { Left = 10, Top = 85, Width = 465, Height = 240, Visible = false };
+        _pnlImgMode = new Panel { Left = 10, Top = 115, Width = 465, Height = 220, Visible = false };
         _btnBrowseMouseImg = new Button { Text = ko ? "이미지 선택..." : "Browse...", Left = 0, Top = 5, Width = 105, Height = 30 };
         _btnBrowseMouseImg.Click += (s, e) => SelectImageForAction();
 
@@ -233,7 +255,7 @@ public class ActionEditDialog : Form
         _pnlImgMode.Controls.AddRange(new Control[] { _btnBrowseMouseImg, _txtMouseImagePath, _picMousePreview, lblAccTitle, _numMouseAccuracy, lblPct, _sliderMouseAccuracy, _btnMouseRoi, _lblMouseRoi });
 
         // 3-C. 조건 감지 모드
-        _pnlTriggerMode = new Panel { Left = 10, Top = 85, Width = 465, Height = 240, Visible = false };
+        _pnlTriggerMode = new Panel { Left = 10, Top = 115, Width = 465, Height = 220, Visible = false };
         var lblTrigHint = new Label
         {
             Text = ko 
@@ -246,7 +268,7 @@ public class ActionEditDialog : Form
             ForeColor = Color.DarkSlateGray
         };
         _pnlTriggerMode.Controls.Add(lblTrigHint);
-        _pnlMouse.Controls.AddRange(new Control[] { lblMouseBtn, _cboMouseButton, lblMode, _cboMouseMode, _pnlCoordMode, _pnlImgMode, _pnlTriggerMode });
+        _pnlMouse.Controls.AddRange(new Control[] { lblMouseBtn, _cboMouseButton, lblMouseStroke, _cboMouseStrokeMode, _lblMouseHold, _numMouseHold, _lblMousePost, _numMousePost, lblMode, _cboMouseMode, _pnlCoordMode, _pnlImgMode, _pnlTriggerMode });
 
         // 4. Variable Panel
         _pnlVariable = new Panel { Left = 20, Top = 60, Width = 485, Height = 340, Visible = false };
@@ -421,6 +443,13 @@ public class ActionEditDialog : Form
         _lblHold.ForeColor = isDownUp ? (AppSettings.Current.IsDarkMode ? Color.White : Color.Black) : Color.Gray;
     }
 
+    private void UpdateMouseStrokeModeUi()
+    {
+        bool isDownUp = _cboMouseStrokeMode.SelectedIndex == 0;
+        _numMouseHold.Enabled = isDownUp;
+        _lblMouseHold.ForeColor = isDownUp ? (AppSettings.Current.IsDarkMode ? Color.White : Color.Black) : Color.Gray;
+    }
+
     private void LoadActionData()
     {
         _cboActionType.SelectedIndex = ActionData.Type switch
@@ -453,6 +482,12 @@ public class ActionEditDialog : Form
             MouseButtonType.XButton2 => 4,
             _ => 0
         };
+        _cboMouseStrokeMode.SelectedIndex = (int)ActionData.MouseMode;
+        if (_cboMouseStrokeMode.SelectedIndex < 0) _cboMouseStrokeMode.SelectedIndex = 0;
+        _numMouseHold.Value = Math.Clamp(ActionData.HoldTimeMs > 0 ? ActionData.HoldTimeMs : 35, 10, 5000);
+        _numMousePost.Value = Math.Clamp(ActionData.PostDelayMs, 0, 10000);
+        UpdateMouseStrokeModeUi();
+
         if (ActionData.TargetMode == MouseTargetMode.TargetImage || !string.IsNullOrEmpty(ActionData.TargetImagePath) || !string.IsNullOrEmpty(ActionData.TargetImageBase64))
             _cboMouseMode.SelectedIndex = 1;
         else if (ActionData.TargetMode == MouseTargetMode.TriggerDetected || ActionData.ClickDetectedLocation)
@@ -534,6 +569,33 @@ public class ActionEditDialog : Form
                     4 => MouseButtonType.XButton2,
                     _ => MouseButtonType.Left
                 };
+                ActionData.MouseMode = _cboMouseStrokeMode.SelectedIndex switch
+                {
+                    1 => MouseStrokeMode.MouseDown,
+                    2 => MouseStrokeMode.MouseUp,
+                    _ => MouseStrokeMode.MouseDownUp
+                };
+                ActionData.HoldTimeMs = (int)_numMouseHold.Value;
+                ActionData.PostDelayMs = (int)_numMousePost.Value;
+
+                string mouseStrokeLabelKo = ActionData.MouseMode switch
+                {
+                    MouseStrokeMode.MouseDown => "⬇️ 마우스다운",
+                    MouseStrokeMode.MouseUp => "⬆️ 마우스업",
+                    _ => "🖱️ 마우스 클릭"
+                };
+                string mouseStrokeLabelEn = ActionData.MouseMode switch
+                {
+                    MouseStrokeMode.MouseDown => "⬇️ Mouse Down",
+                    MouseStrokeMode.MouseUp => "⬆️ Mouse Up",
+                    _ => "🖱️ Mouse Click"
+                };
+                string strokeDetails = ActionData.MouseMode == MouseStrokeMode.MouseDownUp
+                    ? $"(누름 {ActionData.HoldTimeMs}ms, 딜레이 {ActionData.PostDelayMs}ms)"
+                    : $"(딜레이 {ActionData.PostDelayMs}ms)";
+                string strokeDetailsEn = ActionData.MouseMode == MouseStrokeMode.MouseDownUp
+                    ? $"(Hold {ActionData.HoldTimeMs}ms, Delay {ActionData.PostDelayMs}ms)"
+                    : $"(Delay {ActionData.PostDelayMs}ms)";
 
                 if (_cboMouseMode.SelectedIndex == 0)
                 {
@@ -542,8 +604,8 @@ public class ActionEditDialog : Form
                     ActionData.CustomX = (int)_numX.Value;
                     ActionData.CustomY = (int)_numY.Value;
                     ActionData.Description = ko
-                        ? $"🖱️ 마우스 클릭 (좌표): [{ActionData.CustomX}, {ActionData.CustomY}] ({ActionData.MouseButton})"
-                        : $"🖱️ Mouse Click (Coords): [{ActionData.CustomX}, {ActionData.CustomY}] ({ActionData.MouseButton})";
+                        ? $"{mouseStrokeLabelKo} (좌표): [{ActionData.CustomX}, {ActionData.CustomY}] ({ActionData.MouseButton}) {strokeDetails}"
+                        : $"{mouseStrokeLabelEn} (Coords): [{ActionData.CustomX}, {ActionData.CustomY}] ({ActionData.MouseButton}) {strokeDetailsEn}";
                 }
                 else if (_cboMouseMode.SelectedIndex == 1)
                 {
@@ -555,16 +617,16 @@ public class ActionEditDialog : Form
                     if (string.IsNullOrEmpty(imgName)) imgName = ko ? "내장 이미지" : "Embedded Image";
 
                     ActionData.Description = ko
-                        ? $"🖱️ 마우스 클릭 (이미지 탐색): [{imgName}] ({ActionData.MouseButton}, 정확도 {ActionData.TargetImageAccuracyPercent}%)"
-                        : $"🖱️ Mouse Click (Image Match): [{imgName}] ({ActionData.MouseButton}, Acc {ActionData.TargetImageAccuracyPercent}%)";
+                        ? $"{mouseStrokeLabelKo} (이미지 탐색): [{imgName}] ({ActionData.MouseButton}, 정확도 {ActionData.TargetImageAccuracyPercent}%) {strokeDetails}"
+                        : $"{mouseStrokeLabelEn} (Image Match): [{imgName}] ({ActionData.MouseButton}, Acc {ActionData.TargetImageAccuracyPercent}%) {strokeDetailsEn}";
                 }
                 else
                 {
                     ActionData.TargetMode = MouseTargetMode.TriggerDetected;
                     ActionData.ClickDetectedLocation = true;
                     ActionData.Description = ko
-                        ? $"🖱️ 마우스 클릭 (조건 감지 위치): [감지 위치 중심] ({ActionData.MouseButton})"
-                        : $"🖱️ Mouse Click (Detected): [Trigger Location] ({ActionData.MouseButton})";
+                        ? $"{mouseStrokeLabelKo} (조건 감지 위치): [감지 위치 중심] ({ActionData.MouseButton}) {strokeDetails}"
+                        : $"{mouseStrokeLabelEn} (Detected): [Trigger Location] ({ActionData.MouseButton}) {strokeDetailsEn}";
                 }
                 break;
 

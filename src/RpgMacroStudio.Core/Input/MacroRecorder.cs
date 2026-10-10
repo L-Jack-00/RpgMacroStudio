@@ -465,39 +465,109 @@ public class MacroRecorder : IDisposable
             }
             else if (ev.Type == RawInputType.MouseDown)
             {
-                // 대응하는 MouseUp 탐색
+                // 대응하는 다음 MouseUp 검색
                 RawInputEvent? matchingMouseUp = null;
+                bool hasInterleavedEvent = false;
+
                 for (int j = i + 1; j < rawEvents.Count; j++)
                 {
-                    if (rawEvents[j].Type == RawInputType.MouseUp && rawEvents[j].MouseButton == ev.MouseButton)
+                    var nextEv = rawEvents[j];
+                    if (nextEv.Type == RawInputType.MouseUp && nextEv.MouseButton == ev.MouseButton)
                     {
-                        matchingMouseUp = rawEvents[j];
+                        matchingMouseUp = nextEv;
+                        break;
+                    }
+                    hasInterleavedEvent = true;
+                }
+
+                if (matchingMouseUp != null && !hasInterleavedEvent)
+                {
+                    // [단독 입력]: 다른 키/마우스와 겹치지 않는 순수 단일 클릭 -> MouseDownUp
+                    int holdTime = Math.Clamp((int)(matchingMouseUp.TimestampMs - ev.TimestampMs), 15, 5000);
+                    timedActions.Add(new TimedAction
+                    {
+                        StartTime = ev.TimestampMs,
+                        EndTime = ev.TimestampMs + holdTime,
+                        Action = new MacroAction
+                        {
+                            Type = ActionType.MouseClick,
+                            MouseButton = ev.MouseButton,
+                            MouseMode = MouseStrokeMode.MouseDownUp,
+                            TargetMode = MouseTargetMode.Coordinates,
+                            CustomX = ev.ScreenPoint.X,
+                            CustomY = ev.ScreenPoint.Y,
+                            HoldTimeMs = holdTime,
+                            PostDelayMs = 0,
+                            Description = $"🖱️ 마우스 {ev.MouseButton} 클릭 ({ev.ScreenPoint.X}, {ev.ScreenPoint.Y}) ({holdTime}ms)"
+                        }
+                    });
+                    handledEvents.Add(ev);
+                    handledEvents.Add(matchingMouseUp);
+                }
+                else
+                {
+                    // [동시/드래그 입력]: 누른 채 다른 키/마우스가 동작함 -> MouseDown 분리
+                    timedActions.Add(new TimedAction
+                    {
+                        StartTime = ev.TimestampMs,
+                        EndTime = ev.TimestampMs,
+                        Action = new MacroAction
+                        {
+                            Type = ActionType.MouseClick,
+                            MouseButton = ev.MouseButton,
+                            MouseMode = MouseStrokeMode.MouseDown,
+                            TargetMode = MouseTargetMode.Coordinates,
+                            CustomX = ev.ScreenPoint.X,
+                            CustomY = ev.ScreenPoint.Y,
+                            HoldTimeMs = 0,
+                            PostDelayMs = 0,
+                            Description = $"⬇️ 마우스다운: {ev.MouseButton} ({ev.ScreenPoint.X}, {ev.ScreenPoint.Y})"
+                        }
+                    });
+                    handledEvents.Add(ev);
+                }
+            }
+            else if (ev.Type == RawInputType.MouseUp)
+            {
+                // 선행 MouseDown이 없는 고아 MouseUp(예: 녹화 시작 버튼 릴리즈 등)은 필터링
+                bool hasPrecedingDown = false;
+                for (int k = 0; k < i; k++)
+                {
+                    if (rawEvents[k].Type == RawInputType.MouseDown && rawEvents[k].MouseButton == ev.MouseButton)
+                    {
+                        hasPrecedingDown = true;
                         break;
                     }
                 }
 
-                long endTime = matchingMouseUp?.TimestampMs ?? ev.TimestampMs;
-                timedActions.Add(new TimedAction
+                if (!hasPrecedingDown)
                 {
-                    StartTime = ev.TimestampMs,
-                    EndTime = endTime,
-                    Action = new MacroAction
+                    continue;
+                }
+
+                // 이미 MouseDownUp으로 묶이지 않은 MouseUp -> 개별 MouseUp 액션 생성
+                if (!handledEvents.Contains(ev))
+                {
+                    timedActions.Add(new TimedAction
                     {
-                        Type = ActionType.MouseClick,
-                        MouseButton = ev.MouseButton,
-                        TargetMode = MouseTargetMode.Coordinates,
-                        CustomX = ev.ScreenPoint.X,
-                        CustomY = ev.ScreenPoint.Y,
-                        Description = $"🖱️ 마우스 {ev.MouseButton} 클릭 ({ev.ScreenPoint.X}, {ev.ScreenPoint.Y})"
-                    }
-                });
-                handledEvents.Add(ev);
-                if (matchingMouseUp != null)
-                {
-                    handledEvents.Add(matchingMouseUp);
+                        StartTime = ev.TimestampMs,
+                        EndTime = ev.TimestampMs,
+                        Action = new MacroAction
+                        {
+                            Type = ActionType.MouseClick,
+                            MouseButton = ev.MouseButton,
+                            MouseMode = MouseStrokeMode.MouseUp,
+                            TargetMode = MouseTargetMode.Coordinates,
+                            CustomX = ev.ScreenPoint.X,
+                            CustomY = ev.ScreenPoint.Y,
+                            HoldTimeMs = 0,
+                            PostDelayMs = 0,
+                            Description = $"⬆️ 마우스업: {ev.MouseButton} ({ev.ScreenPoint.X}, {ev.ScreenPoint.Y})"
+                        }
+                    });
+                    handledEvents.Add(ev);
                 }
             }
-            // RawInputType.MouseUp 중 handledEvents에 없는 것은 시작 버튼 릴리즈 등 고아 이벤트이므로 완전 무시
         }
 
         // 2. 타임라인 순으로 정렬
@@ -568,6 +638,40 @@ public class MacroRecorder : IDisposable
                 KeyMode = KeyStrokeMode.KeyUp,
                 PostDelayMs = 0,
                 Description = $"⬆️ 키업: [{AppKeyHelper.FormatKey(unreleased)}] (녹화 종료 자동 해제)"
+            });
+        }
+
+        // 6. 마우스 영구 눌림 방지 안전망: MouseDown만 있고 대응 MouseUp이 없는 미해제 버튼이 있으면 마지막에 MouseUp 추가
+        var unreleasedMouseButtons = new HashSet<MouseButtonType>();
+        Point lastMousePt = Point.Empty;
+        foreach (var act in mergedActions)
+        {
+            if (act.Type == ActionType.MouseClick)
+            {
+                lastMousePt = new Point(act.CustomX, act.CustomY);
+                if (act.MouseMode == MouseStrokeMode.MouseDown)
+                {
+                    unreleasedMouseButtons.Add(act.MouseButton);
+                }
+                else if (act.MouseMode == MouseStrokeMode.MouseUp)
+                {
+                    unreleasedMouseButtons.Remove(act.MouseButton);
+                }
+            }
+        }
+
+        foreach (var unreleasedBtn in unreleasedMouseButtons)
+        {
+            mergedActions.Add(new MacroAction
+            {
+                Type = ActionType.MouseClick,
+                MouseButton = unreleasedBtn,
+                MouseMode = MouseStrokeMode.MouseUp,
+                TargetMode = MouseTargetMode.Coordinates,
+                CustomX = lastMousePt.X,
+                CustomY = lastMousePt.Y,
+                PostDelayMs = 0,
+                Description = $"⬆️ 마우스업: {unreleasedBtn} ({lastMousePt.X}, {lastMousePt.Y}) (녹화 종료 자동 해제)"
             });
         }
 

@@ -168,6 +168,13 @@ public static class WindowsInputSimulator
     /// </summary>
     public static IReadOnlyCollection<Keys> GetActivePressedKeys() => _activePressedKeys.Keys.ToList();
 
+    /// <summary>
+    /// 현재 물리적으로 눌려 있는(MouseDown 유지 중인) 마우스 버튼 목록을 반환합니다.
+    /// </summary>
+    public static IReadOnlyCollection<Data.MouseButtonType> GetActivePressedMouseButtons() => _activePressedMouseButtons.Keys.ToList();
+
+    internal static void TrackPressedMouseButtonForTesting(Data.MouseButtonType button) => _activePressedMouseButtons[button] = 1;
+
     private static bool IsExtendedKey(Keys vkCode) =>
         vkCode == Keys.Up || vkCode == Keys.Down || vkCode == Keys.Left || vkCode == Keys.Right ||
         vkCode == Keys.Home || vkCode == Keys.End || vkCode == Keys.PageUp || vkCode == Keys.PageDown ||
@@ -248,11 +255,46 @@ public static class WindowsInputSimulator
         SetCursorPos(targetX, targetY);
     }
 
+    private static readonly ConcurrentDictionary<Data.MouseButtonType, byte> _activePressedMouseButtons = new();
+
+    private static void GetMouseButtonFlags(Data.MouseButtonType button, out uint downFlag, out uint upFlag, out uint mouseData)
+    {
+        downFlag = MOUSEEVENTF_LEFTDOWN;
+        upFlag = MOUSEEVENTF_LEFTUP;
+        mouseData = 0;
+
+        switch (button)
+        {
+            case Data.MouseButtonType.Left:
+                downFlag = MOUSEEVENTF_LEFTDOWN;
+                upFlag = MOUSEEVENTF_LEFTUP;
+                break;
+            case Data.MouseButtonType.Right:
+                downFlag = MOUSEEVENTF_RIGHTDOWN;
+                upFlag = MOUSEEVENTF_RIGHTUP;
+                break;
+            case Data.MouseButtonType.Middle:
+                downFlag = MOUSEEVENTF_MIDDLEDOWN;
+                upFlag = MOUSEEVENTF_MIDDLEUP;
+                break;
+            case Data.MouseButtonType.XButton1:
+                downFlag = MOUSEEVENTF_XDOWN;
+                upFlag = MOUSEEVENTF_XUP;
+                mouseData = XBUTTON1;
+                break;
+            case Data.MouseButtonType.XButton2:
+                downFlag = MOUSEEVENTF_XDOWN;
+                upFlag = MOUSEEVENTF_XUP;
+                mouseData = XBUTTON2;
+                break;
+        }
+    }
+
     /// <summary>
     /// 휴머나이저를 적용하여 지정된 화면 좌표로 마우스를 이동하고 자연스럽게 클릭합니다.
     /// (미세 손떨림 오차, 인간 곡선 궤적 이동, 클릭 유지 시간, 릴리즈 지연 반영)
     /// </summary>
-    public static void SendMouseClick(int x, int y, Data.MouseButtonType button = Data.MouseButtonType.Left)
+    public static void SendMouseClick(int x, int y, Data.MouseButtonType button = Data.MouseButtonType.Left, int holdTimeBaseMs = 35, int postDelayBaseMs = 50)
     {
         lock (_hardwareInputLock)
         {
@@ -263,43 +305,16 @@ public static class WindowsInputSimulator
             int settling = InputHumanizer.GetMouseSettlingDelay();
             MoveMouseSmoothly(hx, hy, settling);
 
-            uint downFlag = MOUSEEVENTF_LEFTDOWN;
-            uint upFlag = MOUSEEVENTF_LEFTUP;
-            uint mouseData = 0;
-
-            switch (button)
-            {
-                case Data.MouseButtonType.Left:
-                    downFlag = MOUSEEVENTF_LEFTDOWN;
-                    upFlag = MOUSEEVENTF_LEFTUP;
-                    break;
-                case Data.MouseButtonType.Right:
-                    downFlag = MOUSEEVENTF_RIGHTDOWN;
-                    upFlag = MOUSEEVENTF_RIGHTUP;
-                    break;
-                case Data.MouseButtonType.Middle:
-                    downFlag = MOUSEEVENTF_MIDDLEDOWN;
-                    upFlag = MOUSEEVENTF_MIDDLEUP;
-                    break;
-                case Data.MouseButtonType.XButton1:
-                    downFlag = MOUSEEVENTF_XDOWN;
-                    upFlag = MOUSEEVENTF_XUP;
-                    mouseData = XBUTTON1;
-                    break;
-                case Data.MouseButtonType.XButton2:
-                    downFlag = MOUSEEVENTF_XDOWN;
-                    upFlag = MOUSEEVENTF_XUP;
-                    mouseData = XBUTTON2;
-                    break;
-            }
+            GetMouseButtonFlags(button, out uint downFlag, out uint upFlag, out uint mouseData);
 
             // 3. 마우스 버튼 누름
             mouse_event(downFlag, 0, 0, mouseData, UIntPtr.Zero);
 
             try
             {
-                // 4. 인간적인 손가락 누름 유지 시간 (30~55ms)
-                Thread.Sleep(InputHumanizer.GetHumanizedMouseHold());
+                // 4. 인간적인 손가락 누름 유지 시간 반영
+                int humanHold = Math.Max(InputHumanizer.GetHumanizedMouseHold(), InputHumanizer.GetHumanizedKeyHold(holdTimeBaseMs));
+                Thread.Sleep(humanHold);
             }
             finally
             {
@@ -307,8 +322,49 @@ public static class WindowsInputSimulator
                 mouse_event(upFlag, 0, 0, mouseData, UIntPtr.Zero);
             }
 
-            // 6. 클릭 후 회복 지연 (30~65ms)
-            Thread.Sleep(InputHumanizer.GetMouseReleaseDelay());
+            // 6. 클릭 후 회복 지연
+            int humanPost = Math.Max(InputHumanizer.GetMouseReleaseDelay(), InputHumanizer.GetHumanizedKeyPostDelay(postDelayBaseMs));
+            if (humanPost > 0) Thread.Sleep(humanPost);
+        }
+    }
+
+    /// <summary>
+    /// 지정된 화면 좌표로 마우스를 이동하고 마우스 버튼을 누른 상태(MouseDown)로 유지합니다. (드래그 및 동시 조작 시작)
+    /// </summary>
+    public static void SendMouseDown(int x, int y, Data.MouseButtonType button = Data.MouseButtonType.Left, int postDelayBaseMs = 0)
+    {
+        lock (_hardwareInputLock)
+        {
+            var (hx, hy) = InputHumanizer.GetHumanizedCoordinates(x, y, 2);
+            int settling = InputHumanizer.GetMouseSettlingDelay();
+            MoveMouseSmoothly(hx, hy, settling);
+
+            GetMouseButtonFlags(button, out uint downFlag, out _, out uint mouseData);
+            mouse_event(downFlag, 0, 0, mouseData, UIntPtr.Zero);
+            _activePressedMouseButtons[button] = 1;
+
+            int humanPost = InputHumanizer.GetHumanizedKeyPostDelay(postDelayBaseMs);
+            if (humanPost > 0) Thread.Sleep(humanPost);
+        }
+    }
+
+    /// <summary>
+    /// 지정된 화면 좌표로 마우스를 이동하고 눌려있던 마우스 버튼을 물리적으로 뗍니다(MouseUp). (드래그 및 조작 종료)
+    /// </summary>
+    public static void SendMouseUp(int x, int y, Data.MouseButtonType button = Data.MouseButtonType.Left, int postDelayBaseMs = 0)
+    {
+        lock (_hardwareInputLock)
+        {
+            var (hx, hy) = InputHumanizer.GetHumanizedCoordinates(x, y, 2);
+            int settling = InputHumanizer.GetMouseSettlingDelay();
+            MoveMouseSmoothly(hx, hy, settling);
+
+            GetMouseButtonFlags(button, out _, out uint upFlag, out uint mouseData);
+            mouse_event(upFlag, 0, 0, mouseData, UIntPtr.Zero);
+            _activePressedMouseButtons.TryRemove(button, out _);
+
+            int humanPost = InputHumanizer.GetHumanizedKeyPostDelay(postDelayBaseMs);
+            if (humanPost > 0) Thread.Sleep(humanPost);
         }
     }
 
@@ -321,9 +377,20 @@ public static class WindowsInputSimulator
         {
             mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, UIntPtr.Zero);
             mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, UIntPtr.Zero);
+            mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, UIntPtr.Zero);
             mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, UIntPtr.Zero);
             mouse_event(MOUSEEVENTF_XUP, 0, 0, XBUTTON1, UIntPtr.Zero);
             mouse_event(MOUSEEVENTF_XUP, 0, 0, XBUTTON2, UIntPtr.Zero);
+
+            lock (_hardwareInputLock)
+            {
+                foreach (var kvp in _activePressedMouseButtons)
+                {
+                    GetMouseButtonFlags(kvp.Key, out _, out uint upFlag, out uint mouseData);
+                    mouse_event(upFlag, 0, 0, mouseData, UIntPtr.Zero);
+                }
+                _activePressedMouseButtons.Clear();
+            }
 
             // 1. SendKeyDown으로 물리적으로 눌린 채 유지 중인 모든 키 강제 해제 (키 씹힘/영구 눌림 원천 방지)
             lock (_hardwareInputLock)

@@ -76,6 +76,13 @@ public enum KeyStrokeMode
     KeyUp       // 키업 (손 뗌 - 동시 입력 종료)
 }
 
+public enum MouseStrokeMode
+{
+    MouseDownUp, // 마우스다운업 (누르고 뗌 - 기본 클릭)
+    MouseDown,   // 마우스다운 (누름 유지 - 드래그/동시 입력 시작)
+    MouseUp      // 마우스업 (손 뗌 - 드래그/동시 입력 해제)
+}
+
 public enum MouseButtonType
 {
     Left,
@@ -111,6 +118,7 @@ public class MacroAction
 
     // 3. MouseClick 설정
     public MouseButtonType MouseButton { get; set; } = MouseButtonType.Left;
+    public MouseStrokeMode MouseMode { get; set; } = MouseStrokeMode.MouseDownUp;
     public MouseTargetMode TargetMode { get; set; } = MouseTargetMode.Coordinates;
     public bool ClickDetectedLocation { get; set; } = false; // 하위 호환성 유지용
     public int CustomX { get; set; }

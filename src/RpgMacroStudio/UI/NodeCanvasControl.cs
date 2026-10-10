@@ -243,7 +243,8 @@ public partial class NodeCanvasControl : Control
         _animTimer = new System.Windows.Forms.Timer { Interval = 40 }; // 25 FPS
         _animTimer.Tick += (s, e) =>
         {
-            if (!string.IsNullOrEmpty(_activeState) || IsPinDragging)
+            bool hasNoNodes = IsPinGraphMode && (_profile == null || _profile.Events.Count == 0 || PinGraph.Nodes.Count(n => n.NodeType != GraphNodeType.Start) == 0);
+            if (!string.IsNullOrEmpty(_activeState) || IsPinDragging || hasNoNodes)
             {
                 _pulsePhase = (_pulsePhase + 0.15f) % (float)(Math.PI * 2);
                 Invalidate();

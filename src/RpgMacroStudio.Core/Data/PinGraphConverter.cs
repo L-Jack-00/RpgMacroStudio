@@ -231,7 +231,12 @@ public static class PinGraphConverter
                                 _ => $"⌨️ 키: {act.Key}"
                             },
                             ActionType.Wait => $"⏳ 대기: {act.WaitDurationMs}ms",
-                            ActionType.MouseClick => act.TargetMode == MouseTargetMode.TriggerDetected ? "🖱️ 감지 위치 클릭" : $"🖱️ 클릭 ({act.CustomX}, {act.CustomY})",
+                            ActionType.MouseClick => act.MouseMode switch
+                            {
+                                MouseStrokeMode.MouseDown => act.TargetMode == MouseTargetMode.TriggerDetected ? "⬇️ 마우스다운 (감지)" : $"⬇️ 마우스다운 ({act.CustomX}, {act.CustomY})",
+                                MouseStrokeMode.MouseUp => act.TargetMode == MouseTargetMode.TriggerDetected ? "⬆️ 마우스업 (감지)" : $"⬆️ 마우스업 ({act.CustomX}, {act.CustomY})",
+                                _ => act.TargetMode == MouseTargetMode.TriggerDetected ? "🖱️ 감지 위치 클릭" : $"🖱️ 클릭 ({act.CustomX}, {act.CustomY})"
+                            },
                             ActionType.VariableControl => $"🔢 변수: {act.VariableName} = {act.VariableValue}",
                             ActionType.ChangeState => $"🔄 상태 전이: [{act.TargetState}]",
                             _ => "⚡ 행동"
