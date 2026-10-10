@@ -83,6 +83,15 @@ def main():
         return False
     print("Self-test passed (Return code: 0)!")
 
+    # 릴리즈 패키지 정리: 불필요한 테스트 아웃풋 로그 등 삭제
+    for r_dir, _, files in os.walk(release_dir):
+        for f in files:
+            if f.startswith("test_") or f.endswith(".log"):
+                try:
+                    os.remove(os.path.join(r_dir, f))
+                except Exception:
+                    pass
+
     if os.path.exists(dist_dir):
         try:
             shutil.rmtree(dist_dir)

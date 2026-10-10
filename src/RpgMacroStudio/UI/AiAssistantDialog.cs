@@ -149,8 +149,7 @@ public class AiAssistantDialog : Form
             "Anthropic Claude (Claude 3.5 Sonnet)",
             "DeepSeek (V3 / R1)",
             "Ollama (로컬 무료/오프라인)",
-            "사용자 정의 / OpenAI 호환 (Custom API)",
-            "[테스트 하네스] Mock 엔진 (오프라인)"
+            "사용자 정의 / OpenAI 호환 (Custom API)"
         });
 
         _lblApiKey = new Label { Text = Localization.Get("AiApiKeyLabel"), Location = new Point(365, 26), AutoSize = true };
@@ -590,7 +589,6 @@ public class AiAssistantDialog : Form
             3 => AiProviderType.DeepSeek,
             4 => AiProviderType.Ollama,
             5 => AiProviderType.CustomOpenAiCompatible,
-            6 => AiProviderType.MockTest,
             _ => AiProviderType.Gemini
         };
     }
@@ -606,7 +604,6 @@ public class AiAssistantDialog : Form
             "DeepSeek" => 3,
             "Ollama" => 4,
             "CustomOpenAiCompatible" => 5,
-            "MockTest" => 6,
             _ => 0
         };
 
