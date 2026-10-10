@@ -15,8 +15,15 @@ namespace RpgMacroHarness.UI;
 
 public partial class MainForm
 {
+    private long _lastToggleRecordTick = 0;
+
     private void InitGlobalHotkeys()
     {
+        _macroRecorder.OnStopHotkeyTriggered += () =>
+        {
+            if (IsDisposed || !IsHandleCreated) return;
+            try { BeginInvoke(new Action(ToggleMacroRecording)); } catch { }
+        };
         GlobalHotkeyService.OnRecordPressed += () =>
         {
             if (IsDisposed || !IsHandleCreated) return;
@@ -53,6 +60,10 @@ public partial class MainForm
 
     private void ToggleMacroRecording()
     {
+        long nowTick = Environment.TickCount64;
+        if (nowTick - _lastToggleRecordTick < 350) return;
+        _lastToggleRecordTick = nowTick;
+
         bool ko = Localization.IsKorean;
 
         if (_macroRecorder.IsRecording)

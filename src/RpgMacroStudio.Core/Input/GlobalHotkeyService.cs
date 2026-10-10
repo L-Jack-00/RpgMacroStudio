@@ -119,7 +119,7 @@ public static class GlobalHotkeyService
                 // 예외 무시
             }
 
-            Thread.Sleep(30);
+            Thread.Sleep(10);
         }
     }
 }

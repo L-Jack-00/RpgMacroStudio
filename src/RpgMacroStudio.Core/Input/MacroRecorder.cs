@@ -112,6 +112,7 @@ public class MacroRecorder : IDisposable
 
     public event Action<string>? OnRecordingStatusChanged;
     public event Action<string>? OnInputRecorded;
+    public event Action? OnStopHotkeyTriggered;
 
     public void StartRecording(Rectangle? startButtonBounds = null, string? triggerHotkey = null)
     {
@@ -195,12 +196,25 @@ public class MacroRecorder : IDisposable
             int vkCode = Marshal.ReadInt32(lParam);
             var key = (Keys)vkCode;
 
-            // 녹화 시작 직후(400ms 이내) 시작 트리거 핫키(예: F9) 입력 무시
+            // 녹화 단축키(예: F9) 처리
             long now = _stopwatch.ElapsedMilliseconds;
-            if (now < 400 && !string.IsNullOrEmpty(_triggerHotkey) &&
+            if (!string.IsNullOrEmpty(_triggerHotkey) &&
                 string.Equals(key.ToString(), _triggerHotkey, StringComparison.OrdinalIgnoreCase))
             {
-                return CallNextHookEx(_keyboardHookId, nCode, wParam, lParam);
+                if (now < 400)
+                {
+                    // 녹화 시작 직후(400ms 이내) 시작 트리거 핫키 입력(잔여 KeyDown/KeyUp) 무시
+                    return CallNextHookEx(_keyboardHookId, nCode, wParam, lParam);
+                }
+                else
+                {
+                    // 녹화 중(400ms 이후) 녹화 중단 단축키 입력 감지: 매크로에 기록하지 않고 즉각 중단 트리거 발동
+                    if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN)
+                    {
+                        OnStopHotkeyTriggered?.Invoke();
+                    }
+                    return CallNextHookEx(_keyboardHookId, nCode, wParam, lParam);
+                }
             }
 
             RawInputType? type = null;
