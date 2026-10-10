@@ -69,6 +69,13 @@ public enum ActionType
     ChangeState      // 상태 전환 (예: "전투" -> "마을")
 }
 
+public enum KeyStrokeMode
+{
+    KeyDownUp,  // 키다운업 (누르고 뗌 - 기본값)
+    KeyDown,    // 키다운 (누름 유지 - 동시 입력 시작)
+    KeyUp       // 키업 (손 뗌 - 동시 입력 종료)
+}
+
 public enum MouseButtonType
 {
     Left,
@@ -94,6 +101,7 @@ public class MacroAction
     public string Description { get; set; } = "키 입력";
 
     // 1. KeyPress 설정
+    public KeyStrokeMode KeyMode { get; set; } = KeyStrokeMode.KeyDownUp;
     public string Key { get; set; } = "D1";
     public int HoldTimeMs { get; set; } = 35;
     public int PostDelayMs { get; set; } = 80;

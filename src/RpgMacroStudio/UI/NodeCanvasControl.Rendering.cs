@@ -678,7 +678,13 @@ public partial class NodeCanvasControl
                             contentX += capWidth + 8;
 
                             // 2. 키 홀드 및 지연 표시
-                            g.DrawString($"⌨ 클릭", fontBadge, IsDarkMode ? Brushes.White : Brushes.DimGray, contentX, centerY - 6);
+                            string modeLabel = act.KeyMode switch
+                            {
+                                KeyStrokeMode.KeyDown => "⬇ 다운",
+                                KeyStrokeMode.KeyUp => "⬆ 업",
+                                _ => "⌨ 클릭"
+                            };
+                            g.DrawString(modeLabel, fontBadge, IsDarkMode ? Brushes.White : Brushes.DimGray, contentX, centerY - 6);
                             contentX += 45;
 
                             if (act.PostDelayMs > 0)

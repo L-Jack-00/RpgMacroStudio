@@ -23,8 +23,11 @@ public class ActionEditDialog : Form
 
     // KeyPress 컨트롤
     private CustomComboBox _cboKey = null!;
+    private CustomComboBox _cboKeyMode = null!;
+    private Label _lblHold = null!;
     private NumericUpDown _numHold = null!;
     private NumericUpDown _numPost = null!;
+    private Label _lblKeyTip = null!;
 
     // Wait 컨트롤
     private NumericUpDown _numWait = null!;
@@ -106,13 +109,36 @@ public class ActionEditDialog : Form
         _cboKey = new CustomComboBox { Left = 130, Top = 12, Width = 170, DropDownStyle = ComboBoxStyle.DropDownList };
         foreach (var k in Enum.GetNames(typeof(Keys))) _cboKey.Items.Add(k);
 
-        var lblHold = new Label { Text = ko ? "누름 시간(ms):" : "Hold duration (ms):", Left = 10, Top = 60, Width = 120 };
-        _numHold = new NumericUpDown { Left = 130, Top = 58, Width = 90, Minimum = 10, Maximum = 5000, Value = 35 };
+        var lblKeyMode = new Label { Text = ko ? "입력 동작 방식:" : "Key Action Mode:", Left = 10, Top = 55, Width = 110 };
+        _cboKeyMode = new CustomComboBox { Left = 130, Top = 52, Width = 340, DropDownStyle = ComboBoxStyle.DropDownList };
+        _cboKeyMode.Items.AddRange(new object[]
+        {
+            ko ? "⬇️⬆️ 키다운업 (KeyDownUp - 누르고 뗌, 기본값)" : "⬇️⬆️ Key Down-Up (Press & Release, Default)",
+            ko ? "⬇️ 키다운 (KeyDown - 누름 유지, 동시 입력 시작)" : "⬇️ Key Down (Hold Pressed, Begin Simultaneous)",
+            ko ? "⬆️ 키업 (KeyUp - 손 뗌, 동시 입력 해제)" : "⬆️ Key Up (Release Key, End Simultaneous)"
+        });
+        _cboKeyMode.SelectedIndex = 0;
+        _cboKeyMode.SelectedIndexChanged += (s, e) => UpdateKeyModeUi();
 
-        var lblPost = new Label { Text = ko ? "입력 후 지연(ms):" : "Post delay (ms):", Left = 10, Top = 105, Width = 120 };
-        _numPost = new NumericUpDown { Left = 130, Top = 103, Width = 90, Minimum = 0, Maximum = 10000, Value = 80 };
+        _lblHold = new Label { Text = ko ? "누름 시간(ms):" : "Hold duration (ms):", Left = 10, Top = 95, Width = 120 };
+        _numHold = new NumericUpDown { Left = 130, Top = 93, Width = 90, Minimum = 10, Maximum = 5000, Value = 35 };
 
-        _pnlKey.Controls.AddRange(new Control[] { lblKey, _cboKey, lblHold, _numHold, lblPost, _numPost });
+        var lblPost = new Label { Text = ko ? "입력 후 지연(ms):" : "Post delay (ms):", Left = 10, Top = 135, Width = 120 };
+        _numPost = new NumericUpDown { Left = 130, Top = 133, Width = 90, Minimum = 0, Maximum = 10000, Value = 80 };
+
+        _lblKeyTip = new Label
+        {
+            Text = ko
+                ? "💡 동시 입력(조합키) 팁:\n1. 조합할 키(예: Shift)를 [키다운]으로 누른 상태로 유지하고\n2. 함께 입력할 키(예: 1번)를 [키다운업]으로 실행한 뒤\n3. 마지막에 조합할 키를 [키업]으로 떼면 완벽히 동시 입력됩니다."
+                : "💡 Simultaneous / Combo Key Tip:\n1. Set combo key (e.g. Shift) to [Key Down] (hold pressed)\n2. Set target key (e.g. 1) to [Key Down-Up] (execute)\n3. Finally set combo key to [Key Up] to release.",
+            Left = 10,
+            Top = 180,
+            Width = 460,
+            Height = 80,
+            ForeColor = Color.FromArgb(120, 140, 160)
+        };
+
+        _pnlKey.Controls.AddRange(new Control[] { lblKey, _cboKey, lblKeyMode, _cboKeyMode, _lblHold, _numHold, lblPost, _numPost, _lblKeyTip });
 
         // 2. Wait Panel
         _pnlWait = new Panel { Left = 20, Top = 60, Width = 485, Height = 340, Visible = false };
@@ -388,6 +414,13 @@ public class ActionEditDialog : Form
         WindowState = FormWindowState.Normal;
     }
 
+    private void UpdateKeyModeUi()
+    {
+        bool isDownUp = _cboKeyMode.SelectedIndex == 0;
+        _numHold.Enabled = isDownUp;
+        _lblHold.ForeColor = isDownUp ? (AppSettings.Current.IsDarkMode ? Color.White : Color.Black) : Color.Gray;
+    }
+
     private void LoadActionData()
     {
         _cboActionType.SelectedIndex = ActionData.Type switch
@@ -402,8 +435,11 @@ public class ActionEditDialog : Form
         // Key
         _cboKey.SelectedItem = ActionData.Key;
         if (_cboKey.SelectedIndex < 0) _cboKey.SelectedItem = "D1";
+        _cboKeyMode.SelectedIndex = (int)ActionData.KeyMode;
+        if (_cboKeyMode.SelectedIndex < 0) _cboKeyMode.SelectedIndex = 0;
         _numHold.Value = Math.Clamp(ActionData.HoldTimeMs, 10, 5000);
         _numPost.Value = Math.Clamp(ActionData.PostDelayMs, 0, 10000);
+        UpdateKeyModeUi();
 
         // Wait
         _numWait.Value = Math.Clamp(ActionData.WaitDurationMs, 10, 3600000);
@@ -461,11 +497,26 @@ public class ActionEditDialog : Form
         {
             case ActionType.KeyPress:
                 ActionData.Key = _cboKey.SelectedItem?.ToString() ?? "D1";
+                ActionData.KeyMode = _cboKeyMode.SelectedIndex switch
+                {
+                    1 => KeyStrokeMode.KeyDown,
+                    2 => KeyStrokeMode.KeyUp,
+                    _ => KeyStrokeMode.KeyDownUp
+                };
                 ActionData.HoldTimeMs = (int)_numHold.Value;
                 ActionData.PostDelayMs = (int)_numPost.Value;
-                ActionData.Description = ko
-                    ? $"⌨️ 키 입력: [{ActionData.Key}] (누름 {ActionData.HoldTimeMs}ms, 딜레이 {ActionData.PostDelayMs}ms)"
-                    : $"⌨️ Key Press: [{ActionData.Key}] (Hold {ActionData.HoldTimeMs}ms, Delay {ActionData.PostDelayMs}ms)";
+                ActionData.Description = ActionData.KeyMode switch
+                {
+                    KeyStrokeMode.KeyDown => ko
+                        ? $"⬇️ 키다운: [{ActionData.Key}] (누름 유지, 딜레이 {ActionData.PostDelayMs}ms)"
+                        : $"⬇️ Key Down: [{ActionData.Key}] (Hold Pressed, Delay {ActionData.PostDelayMs}ms)",
+                    KeyStrokeMode.KeyUp => ko
+                        ? $"⬆️ 키업: [{ActionData.Key}] (손 뗌, 딜레이 {ActionData.PostDelayMs}ms)"
+                        : $"⬆️ Key Up: [{ActionData.Key}] (Release, Delay {ActionData.PostDelayMs}ms)",
+                    _ => ko
+                        ? $"⌨️ 키 입력: [{ActionData.Key}] (누름 {ActionData.HoldTimeMs}ms, 딜레이 {ActionData.PostDelayMs}ms)"
+                        : $"⌨️ Key Press: [{ActionData.Key}] (Hold {ActionData.HoldTimeMs}ms, Delay {ActionData.PostDelayMs}ms)"
+                };
                 break;
 
             case ActionType.Wait:

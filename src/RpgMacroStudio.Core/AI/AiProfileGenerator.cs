@@ -70,7 +70,7 @@ CRITICAL JSON SCHEMA RULES:
 
 4. MacroAction Object:
    - Type: One of ["KeyPress", "Wait", "MouseClick", "VariableControl", "ChangeState"]
-   - If KeyPress: Key (e.g. "D1", "Space", "A"), HoldTimeMs (30~60), PostDelayMs (60~120), Description
+   - If KeyPress: Key (e.g. "D1", "Space", "A"), KeyMode (One of ["KeyDownUp", "KeyDown", "KeyUp"], default "KeyDownUp"), HoldTimeMs (30~60), PostDelayMs (60~120), Description
    - If Wait: WaitDurationMs (e.g. 500), Description
    - If MouseClick: MouseButton ("Left", "Right"), TargetMode ("Coordinates", "TargetImage", "TriggerDetected"), CustomX, CustomY, Description
    - If VariableControl: VariableName, VariableOp ("Set", "Add", "Subtract"), VariableValue (number), Description

@@ -22,11 +22,31 @@ public record VersionChangeEntry(
 /// </summary>
 public static class VersionInfo
 {
-    public const string CurrentVersion = "5.0.0";
+    public const string CurrentVersion = "5.1.0";
     public const string AppName = "RPG 매크로 스튜디오";
 
     public static readonly List<VersionChangeEntry> History = new()
     {
+        new VersionChangeEntry(
+            "5.1.0",
+            "2026-10-10",
+            "v5.1.0 키 동시 입력 세분화(키다운업/키다운/키업) 및 물리 누름 자가치유 안전망 탑재",
+            "v5.1.0 Simultaneous Key Input Segmentation (KeyDownUp/KeyDown/KeyUp) & Self-Healing Safety Net",
+            new List<string>
+            {
+                "[키 동시 입력 옵션 3종 세분화] 키 입력 액션을 '키다운업(누르고 뗌, 기본값)', '키다운(누름 유지)', '키업(손 뗌)'의 3가지 모드로 완벽 분리하여 Shift/Ctrl 조합키 및 방향키 누른 채 스킬 사용 등의 동시 입력을 완벽하게 지원합니다.",
+                "[물리적 키 영구 눌림(Stuck Key) 방지 자가 치유 안전망] 매크로 실행 중 눌려 있는 모든 키를 전역 추적하여, 매크로 중지·일시정지·긴급 정지(ESC) 또는 예외 발생 시 물리적으로 눌려 있던 모든 키를 자동으로 즉시 해제합니다.",
+                "[스마트 UI 반응형 편집 지원] 키 편집 다이얼로그에서 '키다운' 또는 '키업' 선택 시 불필요한 누름 시간(Hold Time) 필드가 자동으로 비활성화되며, 조합키 구성 팁 가이드를 제공합니다.",
+                "[전 뷰 모드 시인성 강화] 클래식 계층 표 뷰, FSM 캔버스 노드 칩, 핀 그래프 노드에 ⬇️⬆️(다운업), ⬇️(키다운), ⬆️(키업) 아이콘과 뱃지가 직관적으로 표시됩니다."
+            },
+            new List<string>
+            {
+                "[3-Way Key Input Mode Segmentation] Keyboard actions are now segmented into 'KeyDownUp (Press & Release, Default)', 'KeyDown (Hold Pressed)', and 'KeyUp (Release)', fully enabling simultaneous inputs like combo keys and hold-to-move.",
+                "[Stuck Key Self-Healing Safety Net] Tracks all active held keys globally and guarantees immediate physical release upon macro stop, pause, emergency stop (ESC), or exceptions.",
+                "[Smart Responsive UI in Action Dialog] Automatically disables redundant hold duration controls when KeyDown or KeyUp is selected, with built-in combo key guidelines.",
+                "[Enhanced Visual Representation Across All Views] Clear ⬇️⬆️, ⬇️, and ⬆️ icons and badges across Classic Table, FSM Canvas, and Pin Graph."
+            }
+        ),
         new VersionChangeEntry(
             "5.0.0",
             "2026-10-07",

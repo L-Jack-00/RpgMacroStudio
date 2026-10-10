@@ -51,11 +51,12 @@ public static class SelfTestRunner
         allPassed &= TestEmojiFontIntegrityAndWizardKeyControls();
         allPassed &= TestAiAssistantHarnessAndMultiProviderGeneration();
         allPassed &= TestNodeClipboardAndUndoRedoIntegrity();
+        allPassed &= TestKeyStrokeModesAndSimultaneousInput();
 
         if (allPassed)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("\n🎉 [모든 테스트 통과] 29개 핵심 모듈 검증 성공! v5.0.0 차세대 AI 어시스턴트 코어 및 전뷰 노드 복사/붙여넣기 무결성 검증 완료.");
+            Console.WriteLine("\n🎉 [모든 테스트 통과] 30개 핵심 모듈 검증 성공! v5.1.0 키 동시 입력(키다운/키업) 및 FSM 엔진 무결성 검증 완료.");
             Console.ResetColor();
         }
         else
@@ -2189,12 +2190,130 @@ public static class SelfTestRunner
                 return false;
             }
 
-            Console.WriteLine("  ✔ [통과] 노드/이벤트 클립보드 엔벨로프 무결성, 외부 텍스트 무시 가드 및 Undo/Redo 연동 검증 완료 (29개 테스트 완료)");
+            Console.WriteLine("  ✔ [통과] 노드/이벤트 클립보드 엔벨로프 무결성, 외부 텍스트 무시 가드 및 Undo/Redo 연동 검증 완료");
             return true;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"  ❌ [예외] 클립보드 무결성 테스트 실패: {ex.Message}");
+            return false;
+        }
+    }
+
+    private static bool TestKeyStrokeModesAndSimultaneousInput()
+    {
+        try
+        {
+            // 1. 기본값 및 enum 검증
+            var defAction = new MacroAction();
+            if (defAction.KeyMode != KeyStrokeMode.KeyDownUp)
+            {
+                Console.WriteLine("  ❌ [실패] MacroAction.KeyMode 기본값 오류 (기본값은 KeyDownUp이어야 함)");
+                return false;
+            }
+
+            // 2. JSON 직렬화 / 역직렬화 (KeyDown, KeyUp, KeyDownUp)
+            var profile = new MacroEventProfile
+            {
+                ProfileName = "동시 입력 테스트",
+                States = new List<string> { "기본 상태" }
+            };
+
+            var comboEvt = new MacroEvent
+            {
+                Name = "Shift+1 동시 입력",
+                StateTag = "기본 상태",
+                Actions = new List<MacroAction>
+                {
+                    new MacroAction { Type = ActionType.KeyPress, Key = "ShiftKey", KeyMode = KeyStrokeMode.KeyDown, PostDelayMs = 20, Description = "Shift 누름 유지" },
+                    new MacroAction { Type = ActionType.KeyPress, Key = "D1", KeyMode = KeyStrokeMode.KeyDownUp, HoldTimeMs = 35, PostDelayMs = 20, Description = "1번 스킬 입력" },
+                    new MacroAction { Type = ActionType.KeyPress, Key = "ShiftKey", KeyMode = KeyStrokeMode.KeyUp, PostDelayMs = 50, Description = "Shift 손 뗌" }
+                }
+            };
+            profile.Events.Add(comboEvt);
+
+            string json = MacroEventProfileManager.SaveToString(profile);
+            var restored = MacroEventProfileManager.LoadFromString(json);
+
+            if (restored == null || restored.Events.Count != 1)
+            {
+                Console.WriteLine("  ❌ [실패] 동시 입력 프로필 역직렬화 실패");
+                return false;
+            }
+
+            var acts = restored.Events[0].Actions;
+            if (acts.Count != 3 ||
+                acts[0].KeyMode != KeyStrokeMode.KeyDown ||
+                acts[1].KeyMode != KeyStrokeMode.KeyDownUp ||
+                acts[2].KeyMode != KeyStrokeMode.KeyUp)
+            {
+                Console.WriteLine("  ❌ [실패] 역직렬화된 KeyMode 불일치");
+                return false;
+            }
+
+            // 3. 하위 호환성 검증: KeyMode 필드가 없는 레거시 JSON 역직렬화 시 KeyDownUp으로 복원되는지 확인
+            string legacyJson = """
+            {
+                "ProfileName": "레거시 프로필",
+                "States": ["기본 상태"],
+                "Events": [{
+                    "Id": "legacy-evt-1",
+                    "Name": "구버전 이벤트",
+                    "StateTag": "기본 상태",
+                    "Actions": [{
+                        "Type": "KeyPress",
+                        "Key": "Space",
+                        "HoldTimeMs": 40,
+                        "PostDelayMs": 60
+                    }]
+                }]
+            }
+            """;
+            var legacyRestored = MacroEventProfileManager.LoadFromString(legacyJson);
+            if (legacyRestored == null || legacyRestored.Events[0].Actions[0].KeyMode != KeyStrokeMode.KeyDownUp)
+            {
+                Console.WriteLine("  ❌ [실패] 레거시 JSON 하위 호환성 역직렬화 오류 (KeyMode 기본값 미적용)");
+                return false;
+            }
+
+            // 4. 활성 누름 키 추적 및 ReleaseAllPressedInputs 안전망 검증
+            // 안전한 가상키(Keys.F24)로 시뮬레이터 추적 검증
+            WindowsInputSimulator.ReleaseAllPressedInputs();
+            if (WindowsInputSimulator.GetActivePressedKeys().Count != 0)
+            {
+                Console.WriteLine("  ❌ [실패] 초기 activePressedKeys 미정리");
+                return false;
+            }
+
+            WindowsInputSimulator.SendKeyDown(Keys.F24, 0);
+            if (!WindowsInputSimulator.GetActivePressedKeys().Contains(Keys.F24))
+            {
+                Console.WriteLine("  ❌ [실패] SendKeyDown 후 activePressedKeys 미등록");
+                return false;
+            }
+
+            WindowsInputSimulator.SendKeyUp(Keys.F24, 0);
+            if (WindowsInputSimulator.GetActivePressedKeys().Contains(Keys.F24))
+            {
+                Console.WriteLine("  ❌ [실패] SendKeyUp 후 activePressedKeys 미제거");
+                return false;
+            }
+
+            // 비상정지 / 정지 시 강제 일괄 해제 검증
+            WindowsInputSimulator.SendKeyDown(Keys.F24, 0);
+            WindowsInputSimulator.ReleaseAllPressedInputs();
+            if (WindowsInputSimulator.GetActivePressedKeys().Count != 0)
+            {
+                Console.WriteLine("  ❌ [실패] ReleaseAllPressedInputs 후 activePressedKeys 미클리어");
+                return false;
+            }
+
+            Console.WriteLine("  ✔ [통과] 키 입력 옵션(키다운업/키다운/키업) 세분화, 하위 호환 역직렬화 및 동시 입력/누름 추적 안전망 검증 완료 (30개 테스트 완료)");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌ [예외] 키 입력 모드 테스트 실패: {ex.Message}");
             return false;
         }
     }

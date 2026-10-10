@@ -1179,7 +1179,12 @@ public class ClassicViewControl : UserControl
 
                         string actIcon = act.Type switch
                         {
-                            ActionType.KeyPress => "⌨️",
+                            ActionType.KeyPress => act.KeyMode switch
+                            {
+                                KeyStrokeMode.KeyDown => "⬇️",
+                                KeyStrokeMode.KeyUp => "⬆️",
+                                _ => "⌨️"
+                            },
                             ActionType.Wait => "⏳",
                             ActionType.MouseClick => "🖱️",
                             ActionType.VariableControl => "🔢",
@@ -1254,7 +1259,18 @@ public class ClassicViewControl : UserControl
     {
         return act.Type switch
         {
-            ActionType.KeyPress => ko ? $"키: [{AppKeyHelper.FormatKey(act.Key)}], 누름: {act.HoldTimeMs}ms, 후지연: {act.PostDelayMs}ms" : $"Key: [{AppKeyHelper.FormatKey(act.Key)}], Delay: {act.PostDelayMs}ms",
+            ActionType.KeyPress => act.KeyMode switch
+            {
+                KeyStrokeMode.KeyDown => ko
+                    ? $"키다운: [{AppKeyHelper.FormatKey(act.Key)}], 누름 유지, 후지연: {act.PostDelayMs}ms"
+                    : $"Key Down: [{AppKeyHelper.FormatKey(act.Key)}], Hold, Delay: {act.PostDelayMs}ms",
+                KeyStrokeMode.KeyUp => ko
+                    ? $"키업: [{AppKeyHelper.FormatKey(act.Key)}], 손 뗌, 후지연: {act.PostDelayMs}ms"
+                    : $"Key Up: [{AppKeyHelper.FormatKey(act.Key)}], Release, Delay: {act.PostDelayMs}ms",
+                _ => ko
+                    ? $"키: [{AppKeyHelper.FormatKey(act.Key)}], 누름: {act.HoldTimeMs}ms, 후지연: {act.PostDelayMs}ms"
+                    : $"Key: [{AppKeyHelper.FormatKey(act.Key)}], Hold: {act.HoldTimeMs}ms, Delay: {act.PostDelayMs}ms"
+            },
             ActionType.Wait => ko ? $"지연 대기: {act.WaitDurationMs}ms" : $"Wait: {act.WaitDurationMs}ms",
             ActionType.MouseClick => $"{AppKeyHelper.FormatMouseButtonShort(act.MouseButton, ko)} " + (act.TargetMode == MouseTargetMode.TriggerDetected ? (ko ? "[감지위치]" : "[Detected]") : $"({act.CustomX}, {act.CustomY})"),
             ActionType.VariableControl => $"[{act.VariableName}] {act.VariableOp} {act.VariableValue}",

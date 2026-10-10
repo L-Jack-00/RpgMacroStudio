@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 
 namespace RpgMacroHarness.Input;
@@ -10,6 +11,7 @@ namespace RpgMacroHarness.Input;
 public static class WindowsInputSimulator
 {
     private static readonly object _hardwareInputLock = new();
+    private static readonly ConcurrentDictionary<Keys, byte> _activePressedKeys = new();
     private const int INPUT_KEYBOARD = 1;
     private const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
     private const uint KEYEVENTF_KEYUP = 0x0002;
@@ -98,9 +100,7 @@ public static class WindowsInputSimulator
             byte scan = (byte)MapVirtualKey(vk, 0);
 
             // 방향키 및 특수키(Insert, Delete, Home, End 등) 확장키 플래그 판별
-            bool isExtended = (vkCode == Keys.Up || vkCode == Keys.Down || vkCode == Keys.Left || vkCode == Keys.Right ||
-                               vkCode == Keys.Home || vkCode == Keys.End || vkCode == Keys.PageUp || vkCode == Keys.PageDown ||
-                               vkCode == Keys.Insert || vkCode == Keys.Delete);
+            bool isExtended = IsExtendedKey(vkCode);
             uint extFlag = isExtended ? KEYEVENTF_EXTENDEDKEY : 0u;
 
             // 1. 휴머나이저(Humanizer)로 인간적인 손가락 누름 및 반응 지연 산출
@@ -124,6 +124,54 @@ public static class WindowsInputSimulator
             if (humanPost > 0) Thread.Sleep(humanPost);
         }
     }
+
+    /// <summary>
+    /// 지정된 키를 물리적으로 누른 상태(KeyDown)로 유지합니다. (동시 입력 조합 시작)
+    /// </summary>
+    public static void SendKeyDown(Keys vkCode, int postDelayBaseMs = 0)
+    {
+        lock (_hardwareInputLock)
+        {
+            byte vk = (byte)vkCode;
+            byte scan = (byte)MapVirtualKey(vk, 0);
+            uint extFlag = IsExtendedKey(vkCode) ? KEYEVENTF_EXTENDEDKEY : 0u;
+
+            keybd_event(vk, scan, extFlag, UIntPtr.Zero);
+            _activePressedKeys[vkCode] = scan;
+
+            int humanPost = InputHumanizer.GetHumanizedKeyPostDelay(postDelayBaseMs);
+            if (humanPost > 0) Thread.Sleep(humanPost);
+        }
+    }
+
+    /// <summary>
+    /// 눌려있던 지정 키를 물리적으로 뗍니다(KeyUp). (동시 입력 종료)
+    /// </summary>
+    public static void SendKeyUp(Keys vkCode, int postDelayBaseMs = 0)
+    {
+        lock (_hardwareInputLock)
+        {
+            byte vk = (byte)vkCode;
+            byte scan = (byte)MapVirtualKey(vk, 0);
+            uint extFlag = IsExtendedKey(vkCode) ? KEYEVENTF_EXTENDEDKEY : 0u;
+
+            keybd_event(vk, scan, extFlag | KEYEVENTF_KEYUP, UIntPtr.Zero);
+            _activePressedKeys.TryRemove(vkCode, out _);
+
+            int humanPost = InputHumanizer.GetHumanizedKeyPostDelay(postDelayBaseMs);
+            if (humanPost > 0) Thread.Sleep(humanPost);
+        }
+    }
+
+    /// <summary>
+    /// 현재 물리적으로 눌려 있는(KeyDown 유지 중인) 키 목록을 반환합니다.
+    /// </summary>
+    public static IReadOnlyCollection<Keys> GetActivePressedKeys() => _activePressedKeys.Keys.ToList();
+
+    private static bool IsExtendedKey(Keys vkCode) =>
+        vkCode == Keys.Up || vkCode == Keys.Down || vkCode == Keys.Left || vkCode == Keys.Right ||
+        vkCode == Keys.Home || vkCode == Keys.End || vkCode == Keys.PageUp || vkCode == Keys.PageDown ||
+        vkCode == Keys.Insert || vkCode == Keys.Delete;
 
     private static void TrySendInput(Keys vkCode, byte scan, bool isExtended, bool isKeyUp)
     {
@@ -277,7 +325,20 @@ public static class WindowsInputSimulator
             mouse_event(MOUSEEVENTF_XUP, 0, 0, XBUTTON1, UIntPtr.Zero);
             mouse_event(MOUSEEVENTF_XUP, 0, 0, XBUTTON2, UIntPtr.Zero);
 
-            // 주요 제어키 릴리즈
+            // 1. SendKeyDown으로 물리적으로 눌린 채 유지 중인 모든 키 강제 해제 (키 씹힘/영구 눌림 원천 방지)
+            lock (_hardwareInputLock)
+            {
+                foreach (var kvp in _activePressedKeys)
+                {
+                    byte vk = (byte)kvp.Key;
+                    byte scan = kvp.Value;
+                    uint extFlag = IsExtendedKey(kvp.Key) ? KEYEVENTF_EXTENDEDKEY : 0u;
+                    keybd_event(vk, scan, extFlag | KEYEVENTF_KEYUP, UIntPtr.Zero);
+                }
+                _activePressedKeys.Clear();
+            }
+
+            // 2. 주요 제어키(Ctrl, Shift, Alt 등) 릴리즈
             Keys[] modifierKeys = [Keys.ControlKey, Keys.ShiftKey, Keys.Menu, Keys.LWin, Keys.RWin];
             foreach (var k in modifierKeys)
             {

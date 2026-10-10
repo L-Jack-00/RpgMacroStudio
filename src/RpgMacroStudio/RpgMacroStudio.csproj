@@ -16,9 +16,9 @@
     <Copyright>Copyright © 2026 L. Jack. All rights reserved.</Copyright>
     <NeutralLanguage>ko-KR</NeutralLanguage>
 
-    <Version>5.0.0</Version>
-    <AssemblyVersion>5.0.0</AssemblyVersion>
-    <FileVersion>5.0.0</FileVersion>
+    <Version>5.1.0</Version>
+    <AssemblyVersion>5.1.0</AssemblyVersion>
+    <FileVersion>5.1.0</FileVersion>
     <ApplicationIcon>app_icon.ico</ApplicationIcon>
   </PropertyGroup>
 

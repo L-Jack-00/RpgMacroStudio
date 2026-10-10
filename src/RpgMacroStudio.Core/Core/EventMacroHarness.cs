@@ -494,8 +494,22 @@ public class EventMacroHarness
                 case ActionType.KeyPress:
                     if (Enum.TryParse<Keys>(action.Key, true, out var key))
                     {
-                        Log($"  - ⌨️ 키 입력: [{key}] (휴머나이저 손가락 모사: ~{action.HoldTimeMs}ms, 딜레이: ~{action.PostDelayMs}ms)");
-                        WindowsInputSimulator.SendKeyPress(key, action.HoldTimeMs, action.PostDelayMs);
+                        switch (action.KeyMode)
+                        {
+                            case KeyStrokeMode.KeyDown:
+                                Log($"  - ⬇️ 키다운: [{key}] (누름 유지, 후지연: ~{action.PostDelayMs}ms)");
+                                WindowsInputSimulator.SendKeyDown(key, action.PostDelayMs);
+                                break;
+                            case KeyStrokeMode.KeyUp:
+                                Log($"  - ⬆️ 키업: [{key}] (손 뗌, 후지연: ~{action.PostDelayMs}ms)");
+                                WindowsInputSimulator.SendKeyUp(key, action.PostDelayMs);
+                                break;
+                            case KeyStrokeMode.KeyDownUp:
+                            default:
+                                Log($"  - ⌨️ 키 입력: [{key}] (다운업 모사: ~{action.HoldTimeMs}ms, 딜레이: ~{action.PostDelayMs}ms)");
+                                WindowsInputSimulator.SendKeyPress(key, action.HoldTimeMs, action.PostDelayMs);
+                                break;
+                        }
                     }
                     break;
 

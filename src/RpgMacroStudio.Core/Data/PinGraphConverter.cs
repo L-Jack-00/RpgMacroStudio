@@ -154,7 +154,12 @@ public static class PinGraphConverter
                     var act = evt.Actions[aIdx];
                     string actTitle = act.Type switch
                     {
-                        ActionType.KeyPress => $"⌨️ 키: {act.Key}",
+                        ActionType.KeyPress => act.KeyMode switch
+                        {
+                            KeyStrokeMode.KeyDown => $"⬇️ 키다운: {act.Key}",
+                            KeyStrokeMode.KeyUp => $"⬆️ 키업: {act.Key}",
+                            _ => $"⌨️ 키: {act.Key}"
+                        },
                         ActionType.Wait => $"⏳ 대기: {act.WaitDurationMs}ms",
                         ActionType.MouseClick => act.TargetMode == MouseTargetMode.TriggerDetected ? "🖱️ 감지 위치 클릭" : $"🖱️ 클릭 ({act.CustomX}, {act.CustomY})",
                         ActionType.VariableControl => $"🔢 변수: {act.VariableName} = {act.VariableValue}",
