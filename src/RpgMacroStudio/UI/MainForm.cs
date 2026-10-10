@@ -30,9 +30,13 @@ public partial class MainForm : Form
     private AppViewMode _lastClassicMode = AppViewMode.ClassicTree;
     private bool IsClassicMode => CurrentViewMode == AppViewMode.ClassicList || CurrentViewMode == AppViewMode.ClassicTree;
 
+    // 녹화 대상 이벤트 고정 바인딩 (녹화 중 캔버스/목록 클릭으로 인한 선택 유실 방지)
+    private MacroEvent? _recordingTargetEvent = null;
+    private string? _recordingTargetState = null;
+
     // 선택 상태 및 이벤트 통합 접근 헬퍼 (노드 뷰와 클래식 뷰 완전 일원화)
-    private string? CurrentSelectedState => IsClassicMode ? _classicControl.SelectedState : _canvas.SelectedState;
-    private MacroEvent? CurrentSelectedEvent => IsClassicMode ? _classicControl.SelectedEvent : _canvas.SelectedEvent;
+    private string? CurrentSelectedState => _recordingTargetState ?? (IsClassicMode ? _classicControl.SelectedState : _canvas.SelectedState);
+    private MacroEvent? CurrentSelectedEvent => _recordingTargetEvent ?? (IsClassicMode ? _classicControl.SelectedEvent : _canvas.SelectedEvent);
 
     // 변경 사항 플래그 및 제목 표시줄 '*' 실시간 연동
     private bool _rawIsDirty = false;

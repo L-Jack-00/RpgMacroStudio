@@ -59,6 +59,15 @@ public partial class MainForm
 
     private void OnCanvasSelectionChanged(string? stateName, MacroEvent? evt)
     {
+        // 녹화 진행 중일 때는 캔버스 빈 공간 클릭 등으로 녹화 대상 이벤트 선택이 풀리는 것을 방지
+        if (_macroRecorder.IsRecording && _recordingTargetEvent != null)
+        {
+            if (evt == null && string.IsNullOrEmpty(stateName))
+            {
+                return;
+            }
+        }
+
         _isUpdatingUi = true;
         try
         {
@@ -89,7 +98,7 @@ public partial class MainForm
             _btnDeleteAction.Enabled = hasEvt;
             _btnMoveUpAction.Enabled = hasEvt;
             _btnMoveDownAction.Enabled = hasEvt;
-            _btnRecordMacro.Enabled = hasEvt && !_isMacroRunning;
+            _btnRecordMacro.Enabled = (_macroRecorder.IsRecording || hasEvt) && !_isMacroRunning;
 
             if (!hasEvt)
             {

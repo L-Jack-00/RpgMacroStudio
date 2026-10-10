@@ -72,25 +72,47 @@ public partial class MainForm
             _btnRecordMacro.Text = $"{Localization.Get("BtnRecord")} [{AppSettings.Current.RecordHotkey}]";
             _btnRecordMacro.BackColor = Color.FromArgb(231, 76, 60);
 
-            if (CurrentSelectedEvent != null && recordedActions.Count > 0)
+            // 녹화 대상 이벤트: 녹화 시작 시 바인딩해둔 이벤트를 최우선 사용 (캔버스 클릭 등으로 선택이 풀려도 절대 유실 방지)
+            var targetEvent = _recordingTargetEvent ?? CurrentSelectedEvent ?? _canvas.SelectedEvent;
+            string targetState = _recordingTargetState ?? CurrentSelectedState ?? targetEvent?.StateTag ?? _profile.InitialState;
+
+            if (targetEvent != null && recordedActions.Count > 0)
             {
                 RecordUndo(Localization.IsKorean ? $"매크로 녹화 ({recordedActions.Count}개 입력)" : $"Macro Recording ({recordedActions.Count} inputs)");
-                CurrentSelectedEvent.Actions.AddRange(recordedActions);
+                targetEvent.Actions.AddRange(recordedActions);
                 _isDirty = true;
-                RefreshActionListView(CurrentSelectedEvent);
+
+                // 녹화 대상 이벤트로 화면 선택 및 인스펙터/캔버스 복원
+                OnCanvasSelectionChanged(targetState, targetEvent);
+                RefreshActionListView(targetEvent);
                 SyncAndRefreshAllViews();
                 _classicControl.RefreshSelectedEventItem();
                 _canvas.Update();
                 Update();
 
                 string msg = string.Format(Localization.Get("RecordingFinished"), recordedActions.Count);
-                Log($"[매크로 녹화 완료] {msg}");
+                Log($"[매크로 녹화 완료] {msg} -> '{targetEvent.Name}'에 추가됨");
                 MessageBox.Show(this, msg, ko ? "녹화 완료" : "Recording Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
-            else if (recordedActions.Count == 0)
+            else if (targetEvent != null && recordedActions.Count == 0)
             {
                 Log("[매크로 녹화 중지] 수집된 입력이 없습니다.");
             }
+            else if (targetEvent == null && recordedActions.Count > 0)
+            {
+                Log($"[매크로 녹화 중지] 대상 이벤트가 유실되어 수집된 입력 {recordedActions.Count}개가 보존되지 못했습니다.");
+                MessageBox.Show(this,
+                    ko ? "녹화 대상 이벤트가 유실되어 녹화된 입력을 추가하지 못했습니다." : "Target event lost.",
+                    ko ? "녹화 적용 불가" : "Target Missing",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            else
+            {
+                Log("[매크로 녹화 중지] 수집된 입력이 없습니다.");
+            }
+
+            _recordingTargetEvent = null;
+            _recordingTargetState = null;
             _btnStart.Enabled = true;
         }
         else
@@ -104,7 +126,8 @@ public partial class MainForm
                 return;
             }
 
-            if (_canvas.SelectedEvent == null)
+            var targetEvent = CurrentSelectedEvent ?? _canvas.SelectedEvent;
+            if (targetEvent == null)
             {
                 MessageBox.Show(this,
                     ko ? "녹화한 입력을 추가할 이벤트를 캔버스 또는 목록에서 먼저 선택해주세요." : "Please select an event node to record actions for first.",
@@ -114,6 +137,9 @@ public partial class MainForm
                 return;
             }
 
+            _recordingTargetEvent = targetEvent;
+            _recordingTargetState = CurrentSelectedState ?? _canvas.SelectedState ?? targetEvent.StateTag;
+
             Rectangle btnBounds = Rectangle.Inflate(_btnRecordMacro.RectangleToScreen(_btnRecordMacro.ClientRectangle), 6, 6);
             _macroRecorder.StartRecording(btnBounds, AppSettings.Current.RecordHotkey);
             _btnStart.Enabled = false;
@@ -121,7 +147,7 @@ public partial class MainForm
             _btnRecordMacro.BackColor = Color.FromArgb(192, 57, 43);
 
             string hint = Localization.Get("RecordingStarted");
-            Log($"[매크로 녹화 시작] {hint}");
+            Log($"[매크로 녹화 시작] {hint} (대상: '{targetEvent.Name}')");
         }
     }
 
