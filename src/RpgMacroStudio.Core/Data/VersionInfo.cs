@@ -22,11 +22,31 @@ public record VersionChangeEntry(
 /// </summary>
 public static class VersionInfo
 {
-    public const string CurrentVersion = "5.3.0";
+    public const string CurrentVersion = "5.4.0";
     public const string AppName = "RPG 매크로 스튜디오";
 
     public static readonly List<VersionChangeEntry> History = new()
     {
+        new VersionChangeEntry(
+            "5.4.0",
+            "2026-10-12",
+            "v5.4.0 고정밀 폐루프(Closed-Loop) 타이머 드리프트 보정, 13대 에이전트 종합 감사 및 이식성 하네스 구축",
+            "v5.4.0 Precision Closed-Loop Timer Drift Compensation, 13-Agent Unified Audit & Portable Skill Rig",
+            new List<string>
+            {
+                "[고정밀 폐루프 타이머 틱 제어기 (PrecisionLoopController)] 화면 캡처 및 이미지 분석 연산 소요 시간을 매 틱마다 실시간 측정하고, OS 타이머 퀀텀(15.6ms) 지연으로 인한 누적 오차(Drift)를 피드백 감산 보정하는 자가 치유 폐루프 엔진을 메인 매크로 루프에 장착하여 설정 주기(FPS)에 수학적으로 완벽히 수렴하도록 고도화했습니다.",
+                "[하이브리드 대기 및 즉시 인터럽트 안전망] 4ms 이상의 긴 대기는 CPU 점유율 0%를 유지하며 쉬고, 잔여 1~2ms는 고해상도 SpinWait를 적용하여 Windows OS의 타이머 덜컥거림을 완벽 극복했으며, 정지/비상정지(ESC/F12)/일시정지 신호 수신 시 0ms 즉각 탈출을 보장합니다.",
+                "[13대 전담 에이전트 종합 감사 (Radar Inspector) 승격] 린터 및 무결성 감사 도구에 '잠재 맹점 및 안티패턴 탐지 에이전트(Radar)'를 13번째 감사관으로 신설하여, 루프 내 무보정 Sleep 및 동기 블로킹 데드락 위험성을 상시 능동 감시합니다.",
+                "[크로스 머신 이식성 하네스 구축 (.agents/skills)] 프로젝트 저장소 내에 ljack-skill을 독립 워크스페이스 스킬로 탑재하고 GitHub 공개 원격 저장소와 연동하여, 다른 컴퓨터나 작업 환경에서도 별도 설치 없이 즉시 동일한 개발 하네스를 공유할 수 있도록 지원합니다."
+            },
+            new List<string>
+            {
+                "[Precision Closed-Loop Timing Engine (PrecisionLoopController)] Integrated a self-healing closed-loop tick controller into the main macro loop that dynamically measures frame capture/processing duration and compensates for cumulative OS timer quantum (15.6ms) drift, achieving mathematically sound target FPS convergence.",
+                "[Hybrid Wait & Zero-Latency Interruption] Retains 0% CPU consumption during long wait intervals (>4ms) and utilizes high-resolution SpinWait for the final 1-2ms to overcome OS scheduling jitter, ensuring immediate 0ms breakout upon stop, emergency exit, or pause signals.",
+                "[13-Agent Unified Inspection Architecture (Radar Inspector)] Upgraded the project audit suite with a 13th Inspector dedicated to discovering latent anti-patterns, continuously monitoring uncompensated loop sleep and synchronous thread blocking risks.",
+                "[Cross-Machine Portable Skill Rig (.agents/skills)] Packaged the ljack-skill directly into the project repository (.agents/skills) synchronized with the GitHub public repository, enabling instant, cross-machine zero-configuration agentic development."
+            }
+        ),
         new VersionChangeEntry(
             "5.3.0",
             "2026-10-10",

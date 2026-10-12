@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import zipfile
 import re
+import time
 
 if sys.stdout.encoding != 'utf-8':
     try:
