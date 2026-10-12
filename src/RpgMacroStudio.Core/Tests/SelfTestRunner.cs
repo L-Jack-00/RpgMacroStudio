@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Drawing;
 using System.Text.Json;
 using OpenCvSharp;
@@ -54,11 +55,12 @@ public static class SelfTestRunner
         allPassed &= TestKeyStrokeModesAndSimultaneousInput();
         allPassed &= TestKeySequenceFoldingAndSizeAwareAutoLayout();
         allPassed &= TestMouseStrokeModesAndNoNodesHighlight();
+        allPassed &= TestPrecisionLoopControllerAndDriftCompensation();
 
         if (allPassed)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("\n🎉 [모든 테스트 통과] 32개 핵심 모듈 검증 성공! v5.3.0 마우스 다운/업 세분화, 빈 캔버스 시작 핀 하이라이트 및 녹화 훅 무결성 검증 완료.");
+            Console.WriteLine("\n🎉 [모든 테스트 통과] 33개 핵심 모듈 검증 성공! v5.4.0 폐루프 틱 제어기(PrecisionLoopController), 지연 드리프트 자동 보정 및 맹점 레이더 무결성 검증 완료.");
             Console.ResetColor();
         }
         else
@@ -2553,12 +2555,86 @@ public static class SelfTestRunner
                 return false;
             }
 
-            Console.WriteLine("  ✔ [통과] v5.3.0 마우스 다운/업 세분화, 전역 자가 치유 안전망, 드래그 녹화 분리 및 빈 캔버스 시작 핀 무결성 검증 완료 (32개 테스트 완료)");
+            Console.WriteLine("  ✔ [통과] v5.3.0 마우스 다운/업 세분화, 전역 자가 치유 안전망, 드래그 녹화 분리 및 빈 캔버스 시작 핀 무결성 검증 완료");
             return true;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"  ❌ [예외] 5.3.0 마우스/하이라이트 테스트 실패: {ex.Message}");
+            return false;
+        }
+    }
+
+    private static bool TestPrecisionLoopControllerAndDriftCompensation()
+    {
+        Console.WriteLine("\n[테스트 33] v5.4.0 폐루프 틱 제어기(PrecisionLoopController) 및 드리프트 보정 검증");
+        try
+        {
+            var controller = new PrecisionLoopController();
+            controller.Reset();
+
+            if (controller.AccumulatedDriftMs != 0 || controller.TickCount != 0)
+            {
+                Console.WriteLine("  ❌ [실패] PrecisionLoopController 초기화 상태 비정상");
+                return false;
+            }
+
+            // 1. 빠른 취소 응답성 검증
+            var swCancel = Stopwatch.StartNew();
+            controller.WaitForNextTick(500, () => true);
+            swCancel.Stop();
+            if (swCancel.ElapsedMilliseconds > 30)
+            {
+                Console.WriteLine($"  ❌ [실패] 취소 신호 수신 시 즉시 탈출 실패 (경과: {swCancel.ElapsedMilliseconds}ms)");
+                return false;
+            }
+
+            // 2. 닫힌 루프(Closed-Loop) 드리프트 보정 시뮬레이션
+            // 목표: 20ms 주기 x 8회 = 160ms
+            // 매 틱마다 5ms의 가상 연산 수행
+            controller.Reset();
+            int targetTickMs = 20;
+            int totalTicks = 8;
+            var swTotal = Stopwatch.StartNew();
+
+            for (int i = 0; i < totalTicks; i++)
+            {
+                Thread.Sleep(5); // 5ms 가상 연산
+                controller.WaitForNextTick(targetTickMs);
+            }
+            swTotal.Stop();
+
+            double totalElapsed = swTotal.ElapsedMilliseconds;
+            double expectedTotal = targetTickMs * totalTicks; // 160ms
+            double error = Math.Abs(totalElapsed - expectedTotal);
+
+            // 단순 Sleep(20)이었으면 (5ms + 20ms) * 8 = 200ms+ 소요됨.
+            // 폐루프 보정기에서는 160ms에 근접해야 함 (오차 < 35ms 허용)
+            if (error > 35.0)
+            {
+                Console.WriteLine($"  ❌ [실패] 폐루프 주기 보정 오차 초과: 예상 {expectedTotal}ms, 실제 {totalElapsed}ms (오차: {error}ms)");
+                return false;
+            }
+
+            // 3. EventMacroHarness와 LoopController 바인딩 검증
+            var profile = new MacroEventProfile
+            {
+                CheckIntervalMs = 50,
+                States = new List<string> { "Global", "기본 상태" }
+            };
+            var harness = new EventMacroHarness(profile);
+            if (harness.LoopController == null)
+            {
+                Console.WriteLine("  ❌ [실패] EventMacroHarness.LoopController 인스턴스 누락");
+                return false;
+            }
+
+            Console.WriteLine($"  ✔ [통과] v5.4.0 폐루프 틱 제어기(PrecisionLoopController) 검증 완료 (총 {totalTicks}틱 실제 {totalElapsed}ms, 오차 {error:F1}ms, 누적 드리프트: {controller.AccumulatedDriftMs:F2}ms, 33개 테스트 완료)");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌ [예외] 폐루프 제어기 테스트 실패: {ex.Message}");
             return false;
         }
     }

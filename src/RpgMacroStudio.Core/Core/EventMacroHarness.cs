@@ -20,6 +20,12 @@ public class EventMacroHarness
     private readonly Dictionary<string, DateTime> _lastTriggeredMap = new();
     private readonly Dictionary<string, Mat> _templateCache = new();
     private readonly ConcurrentDictionary<string, (Task Task, CancellationTokenSource Cts, string StateTag)> _runningBranches = new();
+    private readonly PrecisionLoopController _loopController = new();
+
+    /// <summary>
+    /// 고정밀 폐루프(Closed-Loop) 틱 제어기
+    /// </summary>
+    public PrecisionLoopController LoopController => _loopController;
 
     /// <summary>
     /// 현재 하네스의 활성 상태 (예: "전투 모드", "마을/정비" 등)
@@ -83,6 +89,7 @@ public class EventMacroHarness
             EmergencyStop.StartMonitoring(Keys.F12);
 
         Log($"[매크로 가동] FSM 엔진 루프 시작 (현재 상태: [{CurrentState}])");
+        _loopController.Reset();
 
         while (_isRunning)
         {
@@ -98,6 +105,7 @@ public class EventMacroHarness
                 _pauseEvent.Wait(200);
                 if (!_isRunning || EmergencyStop.IsTriggered) break;
                 if (IsPaused) continue;
+                _loopController.Reset(); // 일시정지 해제 후 틱 타이머 재동기화
             }
 
             // 비전 조건이 필요한지 검사 (전역 이벤트 + 현재 상태 이벤트 대상 고속 제로-할당 검사)
@@ -194,7 +202,7 @@ public class EventMacroHarness
                 screen?.Dispose();
             }
 
-            Thread.Sleep(_profile.CheckIntervalMs);
+            _loopController.WaitForNextTick(_profile.CheckIntervalMs, () => !_isRunning || EmergencyStop.IsTriggered || IsPaused);
         }
 
         foreach (var mat in _templateCache.Values) mat.Dispose();

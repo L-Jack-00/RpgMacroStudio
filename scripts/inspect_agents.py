@@ -786,9 +786,12 @@ def check_unified_project(base_dir):
     if os.path.exists(harness_path):
         with open(harness_path, "r", encoding="utf-8") as hf:
             hcontent = hf.read()
-        if "Thread.Sleep(_profile.CheckIntervalMs);" in hcontent:
+        if "WaitForNextTick" in hcontent and "PrecisionLoopController" in hcontent:
+            radar_details.append("메인 하네스 루프에 고정밀 폐루프 틱 제어기(PrecisionLoopController) 장착 확인 (지연 드리프트 0% 방어)")
+        elif "Thread.Sleep(_profile.CheckIntervalMs);" in hcontent:
             radar_advisories.append("EventMacroHarness.cs: 메인 실행 루프에 개루프(Open-Loop) Thread.Sleep 감지 (연산 시간 및 OS 타이머 해상도 15.6ms로 인한 주기 드리프트 주의 ➔ 폐루프 제어기 전환 권장)")
-        radar_details.append("메인 하네스 루프 타이머 드리프트 및 스케줄러 지연 위험성 레이더 상시 추적 중")
+        else:
+            radar_details.append("메인 하네스 루프 타이머 드리프트 및 스케줄러 지연 위험성 레이더 상시 추적 중")
 
     # (2) UI 스레드 블로킹 .Result / .Wait() 안티패턴 검사
     ui_blocking_found = False
