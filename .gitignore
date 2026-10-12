@@ -19,3 +19,4 @@ watchdog_state.json
 
 ## 빌드 릴리즈 배포 패키지 (언제든 build_release.py로 재생성 가능)
 release/
+*.zip
