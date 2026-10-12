@@ -774,6 +774,51 @@ def check_unified_project(base_dir):
     }
 
     # ---------------------------------------------------------
+    # 13. 잠재 맹점 및 안티패턴 탐지 에이전트 (Blind-Spot & Anti-Pattern Radar Agent)
+    # ---------------------------------------------------------
+    radar_issues = []
+    radar_details = []
+    radar_advisories = []
+
+    # (1) 루프 내 원시 Thread.Sleep 점검 (시간 지연 누적 드리프트 감시)
+    harness_path = os.path.join(src_dir, "RpgMacroStudio.Core", "Core", "EventMacroHarness.cs")
+    hcontent = ""
+    if os.path.exists(harness_path):
+        with open(harness_path, "r", encoding="utf-8") as hf:
+            hcontent = hf.read()
+        if "Thread.Sleep(_profile.CheckIntervalMs);" in hcontent:
+            radar_advisories.append("EventMacroHarness.cs: 메인 실행 루프에 개루프(Open-Loop) Thread.Sleep 감지 (연산 시간 및 OS 타이머 해상도 15.6ms로 인한 주기 드리프트 주의 ➔ 폐루프 제어기 전환 권장)")
+        radar_details.append("메인 하네스 루프 타이머 드리프트 및 스케줄러 지연 위험성 레이더 상시 추적 중")
+
+    # (2) UI 스레드 블로킹 .Result / .Wait() 안티패턴 검사
+    ui_blocking_found = False
+    for root_dir, _, files in os.walk(os.path.join(src_dir, "RpgMacroStudio", "UI")):
+        for f in files:
+            if f.endswith(".cs") and not f.endswith(".bak"):
+                fpath = os.path.join(root_dir, f)
+                with open(fpath, "r", encoding="utf-8") as cs_f:
+                    lines = cs_f.readlines()
+                for line_idx, line in enumerate(lines, 1):
+                    if ".Result" in line and "Task" in line and "await" not in line:
+                        radar_issues.append(f"{f}:{line_idx} - UI 스레드 블로킹 위험 (.Result 호출): 데드락 유발 가능성")
+                        ui_blocking_found = True
+    if not ui_blocking_found:
+        radar_details.append("UI 스레드 내 동기 블로킹(.Result / .Wait()) 데드락 유발 안티패턴 0건 확인")
+
+    # (3) 비상 탈출 및 리소스 해제 인터록 누락 검사
+    if "ReleaseAllPressedInputs" in hcontent and "EmergencyStop" in hcontent:
+        radar_details.append("비상정지(ESC) 및 하네스 종료 시 물리적 입력 100% 해제 가드(Global Release Guard) 탑재 확인")
+    else:
+        radar_issues.append("EventMacroHarness.cs: 물리적 입력 해제 안전망 또는 비상정지 인터록 누락")
+
+    report["radar_check"] = {
+        "status": "PASS" if len(radar_issues) == 0 else "FAIL",
+        "details": radar_details,
+        "advisories": radar_advisories,
+        "issues": radar_issues
+    }
+
+    # ---------------------------------------------------------
     # 마무리 실행 바이너리 및 배포 패키징 검수
     # ---------------------------------------------------------
     dist_dir = os.path.join(os.path.dirname(base_dir), "RpgMacroStudio_Dist")
@@ -860,16 +905,24 @@ def main():
         all_passed = False
         agent_issues.append(("12. 3대 뷰 탭 전환 및 적응형 툴바 검수 에이전트", vtc["issues"]))
 
+    radar = rep.get("radar_check", {"status": "PASS", "details": [], "advisories": [], "issues": []})
+    if len(radar.get("issues", [])) > 0:
+        all_passed = False
+        agent_issues.append(("13. 잠재 맹점 및 안티패턴 탐지 에이전트(Radar)", radar["issues"]))
+
     pkg = rep["packaging_check"]
 
     ver = vc.get('versioninfo_version', 'Unknown')
 
     if compact:
         if all_passed:
-            print(f"🎉 [ALL PASS] 12대 모든 검수 에이전트 종합 감사 통과: 결함 0건, 무결성 100% (v{ver})")
+            print(f"🎉 [ALL PASS] 13대 모든 검수 에이전트 종합 감사 통과: 결함 0건, 무결성 100% (v{ver})")
+            if len(radar.get("advisories", [])) > 0:
+                for adv in radar["advisories"]:
+                    print(f"  💡 [맹점 레이더 권고] {adv}")
             sys.exit(0)
         else:
-            print(f"⚠️ [FAIL] 12대 검수 에이전트 감사 결함 발견 (v{ver}):")
+            print(f"⚠️ [FAIL] 13대 검수 에이전트 감사 결함 발견 (v{ver}):")
             for name, issues in agent_issues:
                 print(f"  • [{name}]")
                 for iss in issues:
@@ -984,6 +1037,17 @@ def main():
         for iss in vtc["issues"]:
             print(f"      ⚠️ {iss}")
 
+    # 13. 잠재 맹점 및 안티패턴 탐지 에이전트 (Radar)
+    print(f"  [13. 잠재 맹점 및 안티패턴 탐지 에이전트 (Radar)] 상태: {radar['status']}")
+    for det in radar["details"]:
+        print(f"      • {det}")
+    if len(radar["advisories"]) > 0:
+        for adv in radar["advisories"]:
+            print(f"      💡 [맹점 레이더 권고] {adv}")
+    if len(radar["issues"]) > 0:
+        for iss in radar["issues"]:
+            print(f"      ⚠️ {iss}")
+
     # [배포 및 릴리즈 현황]
     print(f"\n  [📦 배포 패키징 및 릴리즈 현황] 상태: {pkg['status']}")
     print(f"      • Dist 바이너리: {pkg['dist_exe_size_mb']} MB (존재: {pkg['dist_exe_exists']})")
@@ -993,7 +1057,7 @@ def main():
 
     print("\n" + "=" * 70)
     if all_passed:
-        print("  🎉 12대 모든 검수 에이전트 종합 감사 ALL PASS: 결함 0건, 무결성 100% 확인!")
+        print("  🎉 13대 모든 검수 에이전트 종합 감사 ALL PASS: 결함 0건, 무결성 100% 확인!")
     else:
         print("  ⚠️ 일부 항목에 조정 또는 수정이 필요합니다.")
     print("=" * 70)

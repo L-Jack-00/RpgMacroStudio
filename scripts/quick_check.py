@@ -27,15 +27,15 @@ def run():
         return False
 
     # 3. inspect_agents.py --compact
-    print("  [3/3] 12대 에이전트 종합 감사 검증 중...")
+    print("  [3/3] 13대 에이전트 종합 감사 검증 중...")
     i_res = subprocess.run([sys.executable, os.path.join(root, "scripts", "inspect_agents.py"), "--compact"], cwd=root, capture_output=True, text=True, encoding="utf-8")
     if i_res.returncode != 0:
-        print("  ❌ 12대 감사 실패:\n", i_res.stdout)
+        print("  ❌ 13대 감사 실패:\n", i_res.stdout)
         return False
     print(" ", i_res.stdout.strip())
 
     elapsed = round(time.time() - start, 2)
-    print(f"🎉 ⚡ [초고속 검증 통과] 빌드 + 자체 테스트 + 12대 감사 완료 ({elapsed}초 소요)")
+    print(f"🎉 ⚡ [초고속 검증 통과] 빌드 + 자체 테스트 + 13대 감사 완료 ({elapsed}초 소요)")
     return True
 
 if __name__ == "__main__":
