@@ -20,3 +20,10 @@ watchdog_state.json
 ## 빌드 릴리즈 배포 패키지 (언제든 build_release.py로 재생성 가능)
 release/
 *.zip
+
+## 하네스 엔지니어링 가이드 문서 (로컬 전용, 깃허브 동기화 제외)
+AUTONOMOUS_AGENTIC_GUIDE.html
+AUTONOMOUS_AGENTIC_GUIDE_FOR_AI.md
+HARNESS_ENGINEERING_GUIDE.html
+HARNESS_ENGINEERING_GUIDE.md
+HARNESS_ENGINEERING_GUIDE_FOR_AI.md
